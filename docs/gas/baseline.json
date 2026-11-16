@@ -1,15 +1,15 @@
 {
-  "measuredAt": "2026-11-16T17:12:10.875Z",
+  "measuredAt": "2026-11-16T17:53:29.676Z",
   "solc": "0.8.24",
   "optimizerRuns": 200,
   "gas": {
-    "createCircle": 2923580,
-    "join_first": 298168,
-    "join_last_starts_draw": 556710,
-    "finalizeDraw": 409073,
-    "contribute": 127546,
-    "settleRound_allPaid": 171847,
-    "claimPayout": 39869,
-    "settleRound_oneDefault": 314254
+    "createCircle": 3975349,
+    "join_first": 302600,
+    "join_last_starts_draw": 563251,
+    "finalizeDraw": 437060,
+    "contribute": 129698,
+    "settleRound_allPaid": 173029,
+    "claimPayout": 41586,
+    "settleRound_oneDefault": 315055
   }
 }

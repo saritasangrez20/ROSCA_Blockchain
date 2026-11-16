@@ -11,7 +11,8 @@
     "node": "hardhat node",
     "deploy:local": "hardhat run scripts/deploy.js --network localhost",
     "demo": "hardhat run scripts/demo.js",
-    "gas:baseline": "hardhat run scripts/measureGas.js"
+    "gas:baseline": "hardhat run scripts/measureGas.js",
+    "seed:local": "hardhat run scripts/seedLocal.js --network localhost"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "5.0.0",

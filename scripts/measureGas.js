@@ -22,7 +22,7 @@ async function main() {
 
   const cfg = {
     contribution: 1_000n * UNIT, groupSize: 4n, roundDuration: BigInt(30 * DAY), gracePeriod: BigInt(DAY),
-    joinDuration: BigInt(7 * DAY), drawPhaseDuration: BigInt(DAY), coverageBps: 10_000n, maxDefaults: 0n,
+    joinDuration: BigInt(7 * DAY), drawPhaseDuration: BigInt(DAY), maxDefaults: 0n,
     termsCid: "bafy-gas-measure",
   };
 

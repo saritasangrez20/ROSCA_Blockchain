@@ -25,21 +25,32 @@ describe("MockStablecoin", function () {
 });
 
 describe("CollateralVault", function () {
-  it("computes collateral from what a position still owes after payout", async function () {
+  it("computes collateral as 100% of what a position still owes after payout", async function () {
     const { vault } = await loadFixture(systemFixture);
     const c = 1_000n * UNIT;
-    // 4 members, full coverage: slot 1 owes 3 more payments, slot 4 owes none
-    expect(await vault.requiredCollateral(c, 4, 1, 10_000)).to.equal(3n * c);
-    expect(await vault.requiredCollateral(c, 4, 2, 10_000)).to.equal(2n * c);
-    expect(await vault.requiredCollateral(c, 4, 4, 10_000)).to.equal(0n);
-    // half coverage
-    expect(await vault.requiredCollateral(c, 4, 1, 5_000)).to.equal((3n * c) / 2n);
+    // 4 members: slot 1 owes 3 more payments, slot 4 owes none
+    expect(await vault.requiredCollateral(c, 4, 1)).to.equal(3n * c);
+    expect(await vault.requiredCollateral(c, 4, 2)).to.equal(2n * c);
+    expect(await vault.requiredCollateral(c, 4, 4)).to.equal(0n);
   });
 
   it("rejects an impossible position", async function () {
     const { vault } = await loadFixture(systemFixture);
-    await expect(vault.requiredCollateral(1, 4, 0, 10_000)).to.be.revertedWith("Vault: bad position");
-    await expect(vault.requiredCollateral(1, 4, 5, 10_000)).to.be.revertedWith("Vault: bad position");
+    await expect(vault.requiredCollateral(1, 4, 0)).to.be.revertedWith("Vault: bad position");
+    await expect(vault.requiredCollateral(1, 4, 5)).to.be.revertedWith("Vault: bad position");
+  });
+
+  it("a circle can only take deposits from the member or from itself", async function () {
+    const { vault, token, admin, outsider, alice, bob } = await loadFixture(systemFixture);
+    // make `outsider` act as a registered circle for this test
+    await vault.grantRole(await vault.REGISTRAR_ROLE(), admin.address);
+    await vault.registerCircle(outsider.address);
+    await token.connect(alice).approve(await vault.getAddress(), 10n * UNIT);
+    await expect(vault.connect(outsider).deposit(alice.address, bob.address, 10n * UNIT)).to.be.revertedWith(
+      "Vault: payer must be member or circle"
+    );
+    await vault.connect(outsider).deposit(alice.address, alice.address, 10n * UNIT);
+    expect(await vault.collateralOf(outsider.address, alice.address)).to.equal(10n * UNIT);
   });
 
   it("only registered circles can deposit, release or slash", async function () {
@@ -52,7 +63,7 @@ describe("CollateralVault", function () {
       vault,
       "AccessControlUnauthorizedAccount"
     );
-    await expect(vault.connect(outsider).deposit(alice.address, 1)).to.be.revertedWithCustomError(
+    await expect(vault.connect(outsider).deposit(alice.address, alice.address, 1)).to.be.revertedWithCustomError(
       vault,
       "AccessControlUnauthorizedAccount"
     );
@@ -187,9 +198,6 @@ describe("CircleFactory", function () {
     );
     await expect(factory.connect(organizer).createCircle(defaultConfig({ contribution: 0n }))).to.be.revertedWith(
       "Circle: zero contribution"
-    );
-    await expect(factory.connect(organizer).createCircle(defaultConfig({ coverageBps: 10_001n }))).to.be.revertedWith(
-      "Circle: coverage above 100%"
     );
     await expect(factory.connect(organizer).createCircle(defaultConfig({ termsCid: "" }))).to.be.revertedWith(
       "Circle: missing terms"

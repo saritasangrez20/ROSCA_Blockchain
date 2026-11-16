@@ -16,7 +16,6 @@ contract CollateralVault is AccessControl, ReentrancyGuard {
 
     bytes32 public constant REGISTRAR_ROLE = keccak256("REGISTRAR_ROLE");
     bytes32 public constant CIRCLE_ROLE = keccak256("CIRCLE_ROLE");
-    uint256 public constant BPS = 10_000;
 
     IERC20 public immutable token;
 
@@ -44,24 +43,27 @@ contract CollateralVault is AccessControl, ReentrancyGuard {
 
     /// @notice Collateral a member at `position` (1 = paid first) must keep locked.
     /// @dev After receiving the pot, the member still owes (groupSize - position)
-    ///      contributions. Collateral covers `coverageBps` of that debt.
-    function requiredCollateral(uint256 contribution, uint256 groupSize, uint256 position, uint256 coverageBps)
+    ///      contributions. Collateral always covers 100% of that, so a member who
+    ///      stops paying after their payout can never leave the others short.
+    function requiredCollateral(uint256 contribution, uint256 groupSize, uint256 position)
         public
         pure
         returns (uint256)
     {
         require(position >= 1 && position <= groupSize, "Vault: bad position");
-        return (contribution * (groupSize - position) * coverageBps) / BPS;
+        return contribution * (groupSize - position);
     }
 
-    /// @notice Pulls `amount` tokens from `member` and locks them for the calling circle.
-    /// @dev The member approves the vault beforehand.
-    function deposit(address member, uint256 amount) external onlyRole(CIRCLE_ROLE) nonReentrant {
+    /// @notice Locks `amount` tokens as `member`'s collateral for the calling circle.
+    /// @param from who pays: the member themselves (on join, after approving the vault),
+    ///        or the circle (refilling a deposit out of the member's own pot)
+    function deposit(address from, address member, uint256 amount) external onlyRole(CIRCLE_ROLE) nonReentrant {
         require(amount > 0, "Vault: zero amount");
+        require(from == member || from == msg.sender, "Vault: payer must be member or circle");
         // Effects before the external call (checks effects interactions).
         collateralOf[msg.sender][member] += amount;
         totalLocked[msg.sender] += amount;
-        token.safeTransferFrom(member, address(this), amount);
+        token.safeTransferFrom(from, address(this), amount);
         emit CollateralDeposited(msg.sender, member, amount);
     }
 

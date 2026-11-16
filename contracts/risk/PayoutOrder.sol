@@ -7,9 +7,12 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 /// @notice Fair "who gets paid when" draw using commit then reveal.
 /// @dev 1. Each member commits keccak256(secret, member, circle) without showing the secret.
 ///      2. Once everyone committed (or the commit window ends) members reveal their secrets.
-///      3. The random seed mixes every secret, so no single member (and not the organizer)
-///         can choose the order. A member who refuses to reveal can only block the draw,
-///         which cancels the circle with full refunds and records a default for them.
+///      3. The random seed mixes every revealed secret plus the block randomness at the
+///         moment the draw is finalized, so nobody (not the organizer, and not the last
+///         member to reveal) can compute the final order before choosing to reveal.
+///      4. Members who never reveal are left out of the order. The circle removes them
+///         and charges a penalty, so walking away from the draw costs money and cannot
+///         cancel the circle for everyone else.
 contract PayoutOrder is AccessControl {
     bytes32 public constant REGISTRAR_ROLE = keccak256("REGISTRAR_ROLE");
     bytes32 public constant CIRCLE_ROLE = keccak256("CIRCLE_ROLE");
@@ -98,30 +101,35 @@ contract PayoutOrder is AccessControl {
     }
 
     /// @notice Called by the circle to close the draw.
-    /// @return success true when every member revealed
-    /// @return order members in payout order (empty when the draw failed)
-    function finalize() external onlyRole(CIRCLE_ROLE) returns (bool success, address[] memory order) {
+    /// @dev Allowed once everyone revealed, or after the reveal window.
+    /// @return order the members who revealed, in payout order (may be shorter than the
+    ///         member list, or empty if nobody revealed)
+    function finalize() external onlyRole(CIRCLE_ROLE) returns (address[] memory order) {
         Draw storage d = draws[msg.sender];
         require(d.started && !d.finalized, "Order: no active draw");
-        uint256 n = d.members.length;
-        if (d.revealCount < n) {
-            require(block.timestamp > d.revealDeadline, "Order: reveal window still open");
-            d.finalized = true;
-            emit DrawFinalized(msg.sender, false);
-            return (false, new address[](0));
-        }
+        uint256 total = d.members.length;
+        require(d.revealCount == total || block.timestamp > d.revealDeadline, "Order: reveal window still open");
         d.finalized = true;
+
+        uint256 n = d.revealCount;
         order = new address[](n);
-        for (uint256 i = 0; i < n; i++) {
-            order[i] = d.members[i];
+        uint256 k = 0;
+        for (uint256 i = 0; i < total; i++) {
+            if (hasRevealed[msg.sender][d.members[i]]) {
+                order[k] = d.members[i];
+                k++;
+            }
         }
+        // Fresh randomness at finalize time: unknown to anyone when they decided to reveal.
+        bytes32 seed = keccak256(abi.encodePacked(d.seed, block.prevrandao, msg.sender));
         // Fisher Yates shuffle driven by the combined seed.
-        for (uint256 i = n - 1; i > 0; i--) {
-            uint256 j = uint256(keccak256(abi.encodePacked(d.seed, i))) % (i + 1);
-            (order[i], order[j]) = (order[j], order[i]);
+        if (n > 1) {
+            for (uint256 i = n - 1; i > 0; i--) {
+                uint256 j = uint256(keccak256(abi.encodePacked(seed, i))) % (i + 1);
+                (order[i], order[j]) = (order[j], order[i]);
+            }
         }
-        emit DrawFinalized(msg.sender, true);
-        return (true, order);
+        emit DrawFinalized(msg.sender, n == total);
     }
 
     function getDraw(address circle)

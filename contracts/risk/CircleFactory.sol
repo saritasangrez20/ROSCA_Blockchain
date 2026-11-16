@@ -8,8 +8,10 @@ import {ICollateralVault, IPayoutOrder, IReputationRegistry} from "../interfaces
 /// @title CircleFactory
 /// @notice Creates circles and registers each one with the shared modules, so a circle
 ///         can only touch the vault, draw and reputation records once the factory vouches for it.
-/// @dev Baseline: deploys a full Circle contract per call with `new`.
-///      (Gas optimization candidate: EIP 1167 minimal proxy clones.)
+/// @dev Baseline: deploys a full Circle contract per call with `new`, then initializes it.
+///      Circle is set up by `initialize` (not a constructor), so switching to EIP 1167
+///      minimal proxy clones only means replacing the `new Circle()` line with a clone of
+///      one implementation deployed by this factory.
 contract CircleFactory {
     IERC20 public immutable token;
     ICollateralVault public immutable vault;
@@ -46,7 +48,8 @@ contract CircleFactory {
 
     /// @notice W1: the caller becomes the organizer of a new circle.
     function createCircle(Circle.Config calldata cfg) external returns (address circle) {
-        Circle c = new Circle(
+        Circle c = new Circle();
+        c.initialize(
             cfg,
             Circle.Modules({token: token, vault: vault, payoutOrder: payoutOrder, reputation: reputation}),
             msg.sender,
