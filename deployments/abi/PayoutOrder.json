@@ -316,11 +316,6 @@
     "name": "finalize",
     "outputs": [
       {
-        "internalType": "bool",
-        "name": "success",
-        "type": "bool"
-      },
-      {
         "internalType": "address[]",
         "name": "order",
         "type": "address[]"

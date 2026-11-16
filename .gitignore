@@ -7,3 +7,4 @@ typechain-types/
 .env
 deployments/localhost.json
 gas-report*.txt
+deployments/hardhat.json

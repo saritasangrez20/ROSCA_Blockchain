@@ -30,7 +30,6 @@ async function main() {
     gracePeriod: BigInt(3 * DAY),
     joinDuration: BigInt(7 * DAY),
     drawPhaseDuration: BigInt(1 * DAY),
-    coverageBps: 10_000n,
     maxDefaults: 0n,
     termsCid: "bafy-demo-terms",
   };

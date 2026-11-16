@@ -129,11 +129,6 @@
           },
           {
             "internalType": "uint256",
-            "name": "coverageBps",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
             "name": "maxDefaults",
             "type": "uint256"
           },

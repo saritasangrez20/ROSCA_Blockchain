@@ -30,10 +30,9 @@ async function deployAll() {
   return { admin, token, vault, reputation, payoutOrder, factory };
 }
 
-async function main() {
-  const { admin, token, vault, reputation, payoutOrder, factory } = await deployAll();
+/** Writes deployments/<network>.json (plus any extra fields) and the ABIs. */
+async function saveDeployment({ admin, token, vault, reputation, payoutOrder, factory }, extra = {}) {
   const { chainId } = await ethers.provider.getNetwork();
-
   const addresses = {
     network: network.name,
     chainId: Number(chainId),
@@ -43,6 +42,7 @@ async function main() {
     ReputationRegistry: await reputation.getAddress(),
     PayoutOrder: await payoutOrder.getAddress(),
     CircleFactory: await factory.getAddress(),
+    ...extra,
   };
 
   const outDir = path.join(__dirname, "..", "deployments");
@@ -52,13 +52,18 @@ async function main() {
     const { abi } = await artifacts.readArtifact(name);
     fs.writeFileSync(path.join(outDir, "abi", `${name}.json`), JSON.stringify(abi, null, 2));
   }
+  return addresses;
+}
 
+async function main() {
+  const deployed = await deployAll();
+  const addresses = await saveDeployment(deployed);
   console.log("Deployed to", network.name);
   console.table(addresses);
   console.log(`Addresses written to deployments/${network.name}.json, ABIs to deployments/abi/`);
 }
 
-module.exports = { deployAll };
+module.exports = { deployAll, saveDeployment };
 
 if (require.main === module) {
   main().catch((e) => {

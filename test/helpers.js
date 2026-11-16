@@ -12,7 +12,6 @@ function defaultConfig(overrides = {}) {
     gracePeriod: BigInt(1 * DAY),
     joinDuration: BigInt(3 * DAY),
     drawPhaseDuration: BigInt(1 * DAY),
-    coverageBps: 10_000n, // collateral covers 100% of future debt
     maxDefaults: 0n,
     termsCid: "bafybeigdyrztktx5b5m2t5terms0000000000000000000000000000",
     ...overrides,
