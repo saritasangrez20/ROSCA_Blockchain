@@ -51,10 +51,10 @@ npx hardhat compile
 npx hardhat test
 ```
 
-With a gas table per function:
+With a gas table per function (works on Windows, Mac and Linux):
 
 ```bash
-REPORT_GAS=true npx hardhat test
+npm run test:gas
 ```
 
 ## See it work
