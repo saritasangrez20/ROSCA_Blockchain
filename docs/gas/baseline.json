@@ -1,0 +1,15 @@
+{
+  "measuredAt": "2026-11-16T17:12:10.875Z",
+  "solc": "0.8.24",
+  "optimizerRuns": 200,
+  "gas": {
+    "createCircle": 2923580,
+    "join_first": 298168,
+    "join_last_starts_draw": 556710,
+    "finalizeDraw": 409073,
+    "contribute": 127546,
+    "settleRound_allPaid": 171847,
+    "claimPayout": 39869,
+    "settleRound_oneDefault": 314254
+  }
+}
