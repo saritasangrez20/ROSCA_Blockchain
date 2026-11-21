@@ -8,3 +8,9 @@ typechain-types/
 deployments/localhost.json
 gas-report*.txt
 deployments/hardhat.json
+offchain/data/
+frontend/node_modules/
+frontend/dist/
+.ui-circle-url
+.env.local
+*.local
