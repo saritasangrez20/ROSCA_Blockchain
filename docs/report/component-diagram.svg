@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 820" width="1240" height="820" font-family="Atkinson Hyperlegible, Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1d2b36"/></marker>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f6f5c"/></marker>
+    <marker id="o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b7791f"/></marker>
+  </defs>
+  <rect width="1240" height="820" fill="#eef2f0"/>
+  <text x="30" y="40" font-size="24" font-weight="700" fill="#1d2b36">Trustless ROSCA: component diagram</text>
+  <text x="30" y="64" font-size="14" fill="#4a5a66">Solid green arrows: signed transactions. Dark arrows: reads. Amber: off chain data. Dashed box: trust boundary (the chain is the only source of truth).</text>
+
+  <!-- People -->
+  <g font-size="14" fill="#1d2b36">
+    <rect x="30" y="90" width="1180" height="60" fill="#f8faf9" stroke="#c9d3cf"/>
+    <text x="45" y="125" font-weight="700">People</text>
+    <rect x="140" y="102" width="170" height="36" rx="18" fill="#fff" stroke="#1d2b36"/><text x="225" y="125" text-anchor="middle">Organizer</text>
+    <rect x="330" y="102" width="170" height="36" rx="18" fill="#fff" stroke="#1d2b36"/><text x="415" y="125" text-anchor="middle">Member</text>
+    <rect x="520" y="102" width="200" height="36" rx="18" fill="#fff" stroke="#1d2b36"/><text x="620" y="125" text-anchor="middle">Platform admin (pause only)</text>
+    <rect x="740" y="102" width="200" height="36" rx="18" fill="#fff" stroke="#1d2b36"/><text x="840" y="125" text-anchor="middle">Anyone (settle, finalize)</text>
+  </g>
+
+  <!-- Browser -->
+  <g font-size="13.5" fill="#1d2b36">
+    <rect x="30" y="180" width="560" height="250" fill="#f8faf9" stroke="#1d2b36" stroke-width="1.5"/>
+    <text x="45" y="205" font-size="16" font-weight="700">Browser: React + Vite frontend (ethers v6)</text>
+    <text x="45" y="224" fill="#4a5a66">frontend/src</text>
+    <rect x="45" y="238" width="255" height="54" fill="#fff" stroke="#c9d3cf"/><text x="55" y="259" font-weight="700">Wallet and network check</text><text x="55" y="279">MetaMask or local test accounts, faucet</text>
+    <rect x="320" y="238" width="255" height="54" fill="#fff" stroke="#c9d3cf"/><text x="330" y="259" font-weight="700">Role based views</text><text x="330" y="279">Organizer, Member, Admin, Visitor</text>
+    <rect x="45" y="302" width="255" height="54" fill="#fff" stroke="#c9d3cf"/><text x="55" y="323" font-weight="700">Transaction tray, error decoder</text><text x="55" y="343">status, block, gas, plain reasons</text>
+    <rect x="320" y="302" width="255" height="54" fill="#fff" stroke="#c9d3cf"/><text x="330" y="323" font-weight="700">Terms verifier</text><text x="330" y="343">re hash download, compare CID</text>
+    <rect x="45" y="366" width="530" height="50" fill="#fff" stroke="#c9d3cf"/><text x="55" y="387" font-weight="700">Chain fallback reader</text><text x="55" y="405">lists, history and reminders read from the chain if the indexer is down</text>
+  </g>
+
+  <!-- Off chain -->
+  <g font-size="13.5" fill="#1d2b36">
+    <rect x="30" y="470" width="560" height="320" fill="#fbf6ee" stroke="#b7791f" stroke-width="1.5"/>
+    <text x="45" y="495" font-size="16" font-weight="700">Off chain services (Node.js), offchain/</text>
+    <text x="45" y="514" fill="#4a5a66">read only towards the chain; can be deleted and rebuilt</text>
+    <rect x="45" y="528" width="255" height="70" fill="#fff" stroke="#c9d3cf"/><text x="55" y="550" font-weight="700">HTTP API (Express) :4000</text><text x="55" y="570">circles, history, notifications,</text><text x="55" y="588">profiles, IPFS upload and download</text>
+    <rect x="320" y="528" width="255" height="70" fill="#fff" stroke="#c9d3cf"/><text x="330" y="550" font-weight="700">IPFS terms store</text><text x="330" y="570">CIDv1 raw sha256; optional pin</text><text x="330" y="588">to a Kubo node (same CID)</text>
+    <rect x="320" y="612" width="255" height="70" fill="#fff" stroke="#c9d3cf"/><text x="330" y="634" font-weight="700">Event indexer</text><text x="330" y="654">getLogs in chunks, reorg check,</text><text x="330" y="672">projections, full rebuild</text>
+    <rect x="45" y="612" width="255" height="70" fill="#fff" stroke="#c9d3cf"/><text x="55" y="634" font-weight="700">Notifier (in app only)</text><text x="55" y="654">payment, commit and reveal due,</text><text x="55" y="672">payout ready, default, completed</text>
+    <rect x="45" y="696" width="255" height="80" fill="#fff" stroke="#c9d3cf"/><text x="55" y="718" font-weight="700">SQLite (sql.js)</text><text x="55" y="738">events, circles, members, rounds,</text><text x="55" y="756">reputation, notifications;</text><text x="55" y="772">profiles (signed names) kept</text>
+    <rect x="320" y="696" width="255" height="80" fill="#fff" stroke="#c9d3cf"/><text x="330" y="718" font-weight="700">Keeper (separate process)</text><text x="330" y="738">reads the factory directly,</text><text x="330" y="756">simulates, then settles or finalizes;</text><text x="330" y="772">anyone can do the same</text>
+  </g>
+
+  <!-- Chain -->
+  <g font-size="13.5" fill="#1d2b36">
+    <rect x="660" y="180" width="550" height="610" fill="none" stroke="#1d2b36" stroke-width="2" stroke-dasharray="8 6"/>
+    <text x="675" y="205" font-size="16" font-weight="700">Ethereum (Hardhat local, chain 31337): the trusted core</text>
+    <text x="675" y="224" fill="#4a5a66">contracts/ by Member A, untouched in Stage 2</text>
+    <rect x="690" y="245" width="230" height="64" fill="#1d2b36"/><text x="805" y="270" text-anchor="middle" fill="#f8faf9" font-weight="700">CircleFactory</text><text x="805" y="290" text-anchor="middle" fill="#f8faf9">creates and registers circles</text>
+    <rect x="950" y="245" width="230" height="110" fill="#1d2b36"/><text x="1065" y="270" text-anchor="middle" fill="#f8faf9" font-weight="700">Circle (one per committee)</text><text x="1065" y="290" text-anchor="middle" fill="#f8faf9">join, contribute, settle,</text><text x="1065" y="308" text-anchor="middle" fill="#f8faf9">claim, cancel; holds payments</text><text x="1065" y="334" text-anchor="middle" fill="#c9d3cf">inherits BaseCircleLifecycle</text>
+    <rect x="690" y="380" width="230" height="64" fill="#fff" stroke="#1d2b36"/><text x="805" y="405" text-anchor="middle" font-weight="700">CollateralVault</text><text x="805" y="425" text-anchor="middle">deposits, release, slash</text>
+    <rect x="950" y="380" width="230" height="64" fill="#fff" stroke="#1d2b36"/><text x="1065" y="405" text-anchor="middle" font-weight="700">PayoutOrder</text><text x="1065" y="425" text-anchor="middle">commit and reveal draw</text>
+    <rect x="690" y="470" width="230" height="64" fill="#fff" stroke="#1d2b36"/><text x="805" y="495" text-anchor="middle" font-weight="700">ReputationRegistry</text><text x="805" y="515" text-anchor="middle">joins, completions, defaults</text>
+    <rect x="950" y="470" width="230" height="64" fill="#fff" stroke="#1d2b36"/><text x="1065" y="495" text-anchor="middle" font-weight="700">MockStablecoin (mUSD)</text><text x="1065" y="515" text-anchor="middle">ERC20, 6 decimals, faucet</text>
+    <line x1="920" y1="277" x2="948" y2="277" stroke="#1d2b36" stroke-width="1.5" marker-end="url(#a)"/>
+    <path d="M950 340 L935 340 L935 502 L922 502" stroke="#1d2b36" stroke-width="1.5" fill="none" marker-end="url(#a)"/>
+    <path d="M935 412 L922 412" stroke="#1d2b36" stroke-width="1.5" fill="none" marker-end="url(#a)"/>
+    <line x1="1065" y1="355" x2="1065" y2="378" stroke="#1d2b36" stroke-width="1.5" marker-end="url(#a)"/>
+    <rect x="690" y="565" width="490" height="205" fill="#f8faf9" stroke="#c9d3cf"/>
+    <text x="705" y="590" font-weight="700">On chain data (public, permanent)</text>
+    <text x="705" y="612">Money: deposits, payments, pots, credits (withdrawable)</text>
+    <text x="705" y="632">Rules: contribution, size, durations, join rule</text>
+    <text x="705" y="652">State: stage, rounds, paid flags, payout order</text>
+    <text x="705" y="672">Commitments and revealed secrets, reputation counts</text>
+    <text x="705" y="692">Terms CID only (a 59 character fingerprint)</text>
+    <text x="705" y="718" font-weight="700">Never on chain</text>
+    <text x="705" y="740">Names, terms document, reminders, draw secret before reveal,</text>
+    <text x="705" y="758">private keys (stay in the wallet)</text>
+  </g>
+
+  <!-- arrows people -> browser -->
+  <line x1="300" y1="150" x2="300" y2="178" stroke="#1d2b36" stroke-width="1.5" marker-end="url(#a)"/>
+  <!-- browser -> chain: signed tx -->
+  <line x1="590" y1="262" x2="688" y2="262" stroke="#1f6f5c" stroke-width="2.5" marker-end="url(#g)"/>
+  <text x="598" y="236" font-size="12.5" fill="#1f6f5c" font-weight="700">signed txs</text>
+  <text x="598" y="252" font-size="12.5" fill="#1f6f5c" font-weight="700">(wallet)</text>
+  <!-- browser reads chain -->
+  <line x1="590" y1="400" x2="656" y2="400" stroke="#1d2b36" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="598" y="376" font-size="12.5" fill="#1d2b36">RPC reads,</text>
+  <text x="598" y="392" font-size="12.5" fill="#1d2b36">event logs</text>
+  <!-- browser <-> API and IPFS -->
+  <path d="M170 432 L170 468" stroke="#b7791f" stroke-width="2" fill="none" marker-end="url(#o)" marker-start="url(#o)"/>
+  <text x="178" y="455" font-size="12.5" fill="#b7791f">history, reminders, names</text>
+  <path d="M450 432 L450 468" stroke="#b7791f" stroke-width="2" fill="none" marker-end="url(#o)" marker-start="url(#o)"/>
+  <text x="458" y="455" font-size="12.5" fill="#b7791f">terms upload, download by CID</text>
+  <!-- indexer reads every contract's events -->
+  <line x1="656" y1="647" x2="577" y2="647" stroke="#1d2b36" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="598" y="626" font-size="12.5" fill="#1d2b36">events</text>
+  <text x="598" y="641" font-size="12.5" fill="#1d2b36">(read only)</text>
+  <!-- keeper sends anyone-can-call txs -->
+  <line x1="577" y1="736" x2="656" y2="736" stroke="#1f6f5c" stroke-width="2.5" marker-end="url(#g)"/>
+  <text x="598" y="712" font-size="12.5" fill="#1f6f5c" font-weight="700">settle,</text>
+  <text x="598" y="728" font-size="12.5" fill="#1f6f5c" font-weight="700">finalize</text>
+  <!-- indexer feeds notifier -->
+  <line x1="318" y1="647" x2="302" y2="647" stroke="#b7791f" stroke-width="2" marker-end="url(#o)"/>
+</svg>
