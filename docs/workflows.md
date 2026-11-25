@@ -9,13 +9,13 @@ Every user action, who does it, which function runs, and what changes. Example n
 | W2 | Join | Member | `MockStablecoin.approve(vault, joinCollateral)` then `Circle.join()` | `Open`, before join deadline, not paused, past defaults within limit | Deposit for slot 1 (3,000) locked in the vault. When the last member joins: state `OrderDraw` and the draw starts. |
 | W3a | Commit secret | Member | `PayoutOrder.commit(circle, computeCommitment(secret, me, circle))` | Commit window open | Hidden commitment stored. |
 | W3b | Reveal secret | Member | `PayoutOrder.reveal(circle, secret)` | Everyone committed (or commit window over), reveal window open | Secret mixed into the random seed. |
-| W3c | Finalize draw | Anyone | `Circle.finalizeDraw()` | Everyone revealed, or reveal window over | Members who did not reveal are removed: one contribution of their deposit is shared by the others as a penalty, the rest is refunded, a default is recorded. With 2 or more left: order set from the revealers, extra deposits refunded (4 members: slot 2 keeps 2,000, slot 3 keeps 1,000, slot 4 keeps 0), state `Active`, round 1 starts. With fewer than 2: state `Cancelled`, deposits refunded. |
-| W4 | Contribute | Member | `MockStablecoin.approve(circle, contribution)` then `Circle.contribute()` | `Active`, not paid yet this round, before round end plus grace, not paused | Payment held by the circle. |
+| W3c | Finalize draw | Anyone | `Circle.finalizeDraw()` | Everyone revealed, or reveal window over; in a later block than the last reveal | Members who did not reveal are removed: one contribution of their deposit is shared by the others as a penalty, the rest is refunded, a default is recorded. With 2 or more left: order set from the revealers, extra deposits refunded (4 members: slot 2 keeps 2,000, slot 3 keeps 1,000, slot 4 keeps 0), state `Active`, round 1 starts. With fewer than 2: state `Cancelled`, deposits refunded. |
+| W4 | Contribute | Member | `MockStablecoin.approve(circle, contribution)` then `Circle.contribute()` | `Active`, not paid yet this round, before round end plus grace (plus any time paused during the round), not paused | Payment held by the circle. |
 | W5 | Settle round | Anyone (keeper script) | `Circle.settleRound()` | Everyone paid, or round end plus grace passed | See "Default handling". Pot credited to this round's recipient. Next round starts, or the circle completes. |
 | W6 | Claim payout | Recipient | `Circle.claimPayout()` | Has a credit | Credit sent to the member (pull payment). Works while paused and after cancel. |
 | W7 | Complete | Automatic in the last `settleRound` | internal `_complete()` | Last round settled | Leftover debts taken from deposits, remaining deposits returned, completions recorded. State `Completed`. |
 | W8 | Cancel | Organizer any time while `Open`; anyone after the join deadline | `Circle.cancel()` | `Open` | All deposits refunded. State `Cancelled`. |
-| Admin | Emergency pause | Platform admin | `Circle.pause()` / `unpause()` | Any time | Blocks join and contribute only, for at most 7 days. |
+| Admin | Emergency pause | Platform admin | `Circle.pause()` / `unpause()` | Any time, but a new pause only 7 days after the previous one ended | Blocks join and contribute only, for at most 7 days. The paused time is added to the current round's deadline. |
 
 ## Default handling in detail
 
@@ -61,5 +61,7 @@ Open ──(last member joins)──> OrderDraw ──(2 or more revealed)──
 * `Circle.getMemberInfo(address)`: member or removed, position, deposit, paid this round, claimable,
   debt, deficit, defaults. One call per member row.
 * `CircleFactory.getCircles()`, `getCirclesByOrganizer(address)`.
-* `ReputationRegistry.getRecord(address)`, `getHistory(address)`.
+* `ReputationRegistry.getRecord(address)`. The per entry history is in `ReputationUpdated` events
+  (gas optimization G4); the indexer serves it at `/api/reputation/:address`.
 * `PayoutOrder.getDraw(circle)`, `computeCommitment(secret, member, circle)`, `hasRevealed(circle, member)`.
+* `Circle.roundDeadline()` (includes paused time), `Circle.totalPausedTime()`, `CircleFactory.implementation()`.

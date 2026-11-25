@@ -1,0 +1,239 @@
+\section{System Design}
+\label{sec:design}
+
+\subsection{Roles}
+\begin{description}[leftmargin=2.2cm,style=nextline,itemsep=2pt]
+  \item[Organizer] creates a circle and sets its terms; may cancel it while it is still open. Never
+        touches funds.
+  \item[Member] joins with a deposit, takes part in the payout draw, pays every round, receives the pot once.
+  \item[Admin] the platform operator (the deploying account). May pause joining and paying in an
+        emergency, for a bounded time (Section~\ref{sec:admin}); cannot move money.
+  \item[Anyone] may finalize a draw, settle a round after its deadline, or cancel a circle that never
+        filled. The keeper script does this automatically, but it is a convenience, not a trust point.
+\end{description}
+
+\subsection{Workflows}
+A circle runs eight workflows (the brief asks for at least three); every one changes real state.
+
+\begin{table}[H]
+\centering\small
+\caption{User workflows and the functions behind them}
+\label{tab:workflows}
+\begin{tabularx}{\textwidth}{@{}P{0.55cm}P{2.3cm}P{1.9cm}LL@{}}
+\toprule
+\# & Workflow & Actor & On chain & Off chain \\
+\midrule
+W1 & Create circle & Organizer & \code{CircleFactory.\allowbreak createCircle}: clone, initialize and register a \code{Circle} with amount, size, durations and terms CID & Terms uploaded to IPFS first; the browser checks the CID \\
+W2 & Join & Member & approve the vault, \code{Circle.join}: lock the slot 1 deposit; reputation checked; the last join starts the draw & Display name, signed by the wallet, stored in the indexer \\
+W3 & Draw payout order & All members & \code{PayoutOrder.commit}, \code{reveal}; \code{Circle.finalizeDraw} sets the order, removes non revealers, refunds excess deposits & Reminders before commit and reveal deadlines \\
+W4 & Contribute & Member & approve the circle, \code{Circle.contribute}: paid bit set & Due date reminders \\
+W5 & Settle round & Anyone (keeper) & \code{Circle.settleRound}: slash unpaid members, record defaults, credit the pot & Keeper calls it after the deadline \\
+W6 & Claim payout & Recipient & \code{Circle.claimPayout}: pull payment of every credit & \enquote{Your pot is ready} notification \\
+W7 & Complete & Automatic & last \code{settleRound}: leftover debts, release deposits, record completions & History from the indexer \\
+W8 & Cancel & Organizer, or anyone after the join deadline & \code{Circle.cancel}: everyone refunded & Notification to joined members \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Lifecycle}
+Figure~\ref{fig:lifecycle} shows the five states and the three steps of every round. Any failure
+before the rounds start ends in a full refund; a missed payment during the rounds is covered by
+slashing, not by stopping the circle. \code{BaseCircleLifecycle} enforces the transitions: every
+state changing function has an \code{inState} guard and \code{\_transition} rejects any edge not in the diagram.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  st/.style={draw=boxline, rounded corners=3pt, align=center, minimum width=3.0cm, minimum height=1.15cm, font=\small, fill=white},
+  ar/.style={-{Stealth[length=2.2mm]}, thick, draw=black!75},
+  lb/.style={font=\scriptsize, align=center}]
+\node[st, fill=tintblue] (open) at (0,0) {\textbf{Open}\\members join and\\lock a deposit};
+\node[st, fill=tintblue] (draw) at (4.7,0) {\textbf{Order draw}\\commit, reveal;\\excess refunded};
+\node[st] (contrib) at (10.0,0.2) {\textbf{Contributing}\\pay before deadline\\plus grace};
+\node[st] (settle) at (10.0,-1.7) {\textbf{Settle round}\\unpaid members\\slashed and logged};
+\node[st] (payout) at (10.0,-3.6) {\textbf{Payout claimable}\\recipient pulls\\the pot};
+\node[st, fill=tintgreen, line width=1.1pt] (done) at (10.0,-5.9) {\textbf{Completed}\\deposits released,\\reputation updated};
+\node[st, fill=tintrose] (cancel) at (0,-3.6) {\textbf{Cancelled}\\everyone refunded\\in full};
+\begin{scope}[on background layer]
+  \node[draw=boxline, dashed, rounded corners=5pt, fill=tintgreen!70, inner sep=7pt, fit=(contrib)(settle)(payout), label={[font=\small\bfseries]above:Active: rounds 1 to N}] (rounds) {};
+\end{scope}
+\draw[ar] (open) -- node[lb, above]{last member\\joins} (draw);
+\draw[ar] (draw) -- node[lb, above]{2 or more\\revealed} (contrib.west |- draw);
+\draw[ar] (contrib) -- (settle);
+\draw[ar] (settle) -- (payout);
+\draw[ar] (payout.east) -- ++(0.75,0) |- node[lb, right, pos=0.25]{next\\round} (contrib.east);
+\draw[ar] (payout) -- node[lb, right]{after round N} (done);
+\draw[ar] (open) -- node[lb, left]{organizer, or\\join deadline\\passed unfilled} (cancel);
+\draw[ar] (draw.south) |- node[lb, above, pos=0.75]{fewer than 2 revealed} (cancel.east);
+\end{tikzpicture}
+\caption{Circle lifecycle: five states, three steps per round}
+\label{fig:lifecycle}
+\end{figure}
+
+\subsection{Collateral rule}
+\label{sec:collateral}
+A member at payout position $k$ in a circle of $N$ participants still owes $N-k$ contributions after
+receiving the pot. The vault keeps exactly that much locked:
+\begin{equation}
+  \text{requiredCollateral}(c, N, k) = c \times (N - k)
+\end{equation}
+where $c$ is the contribution. Coverage is 100\%: our planning review found that the originally
+planned 50\% would leave the group short by half of every missed payment, which contradicts
+\enquote{others are made whole}. Early slots lock more and the last slot locks nothing, which keeps
+the credit benefit that flat collateral loses. To stay simple, everyone locks the slot 1 amount
+$c(N-1)$ on joining and the vault refunds the excess once the draw fixes each position. For 4
+members paying 1,000 mUSD the deposits after the draw are 3,000, 2,000, 1,000 and 0 mUSD.
+
+When a round is settled, for every member who did not pay:
+\begin{itemize}
+  \item a member who already received the pot is slashed one contribution (always fully covered);
+  \item a member not yet paid is slashed what their deposit holds; any uncovered part becomes a debt
+        (\code{debtOf}) owed to that round's recipient (\code{deficitOf});
+  \item a member who misses their own payout round simply receives a smaller pot.
+\end{itemize}
+When the recipient is paid, any debt they owe is repaid out of their pot first and credited to whoever
+was shortchanged, and their deposit is refilled from the pot back to 100\% of what they still owe.
+Section~\ref{sec:security} proves this always suffices (attack test A8).
+
+\subsection{Architecture}
+Figure~\ref{fig:architecture} shows the components and the trust boundary. Transactions go straight
+from the member's wallet to the contracts; the off chain services are never in the path of a money
+moving transaction and only read from the chain (the keeper only calls functions anyone may call).
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  box/.style={draw=boxline, rounded corners=2pt, align=center, font=\small, minimum height=0.95cm, inner sep=3pt},
+  pp/.style={box, fill=people, minimum width=2.5cm},
+  oc/.style={box, fill=onchain, minimum width=2.3cm, font=\footnotesize},
+  of/.style={box, fill=offchain, minimum width=3.1cm},
+  ar/.style={-{Stealth[length=2mm]}, draw=black!75},
+  lb/.style={font=\scriptsize, align=center, fill=white, inner sep=1pt}]
+% people
+\node[pp] (org) at (-3.6,6.9) {Organizer};
+\node[pp] (mem) at (0.3,6.9) {Members};
+\node[pp] (adm) at (4.2,6.9) {Admin (pause only)};
+% browser
+\node[box, fill=white, minimum width=13.6cm, minimum height=1.1cm] (ui) at (0.3,5.3) {\textbf{Browser app} (React, Vite, ethers v6): wallet, role based views, transaction tray, error decoder,\\terms re hash check, chain fallback when the indexer is down};
+% off chain
+\node[of] (ipfs) at (-4.3,2.9) {IPFS terms store\\(CIDv1, sha256)};
+\node[of] (idx) at (-4.3,1.5) {Indexer + HTTP API\\(SQLite, rebuildable)};
+\node[of] (noti) at (-4.3,0.1) {Notifier\\(in app reminders)};
+\node[of] (keep) at (-4.3,-1.3) {Keeper\\(settle, finalize, cancel)};
+% on chain
+\node[oc, minimum width=3.1cm, font=\small] (fac) at (2.6,2.9) {\code{CircleFactory}};
+\node[oc, minimum width=2.4cm] (tok) at (6.4,2.9) {\code{MockStablecoin}};
+\node[oc, minimum width=2.8cm, font=\small] (circ) at (2.6,1.5) {\code{Circle} clones\\(one per committee)};
+\node[oc, minimum width=2.4cm] (impl) at (6.4,1.5) {\code{Circle}\\implementation};
+\node[oc] (vault) at (0.6,-0.4) {\code{Collateral}\\\code{Vault}};
+\node[oc] (order) at (3.1,-0.4) {\code{PayoutOrder}};
+\node[oc] (rep) at (5.6,-0.4) {\code{Reputation}\\\code{Registry}};
+\begin{scope}[on background layer]
+  \node[draw=boxline, rounded corners=5pt, fill=offchain!45, inner sep=8pt, fit=(ipfs)(keep), label={[font=\small\bfseries]below:Off chain (Node.js)}] (offz) {};
+  \node[draw=boxline, rounded corners=5pt, fill=onchain!55, inner sep=8pt, fit=(fac)(tok)(vault)(rep), label={[font=\small\bfseries]below:On chain (Ethereum, Hardhat local)}] (onz) {};
+\end{scope}
+\draw[dashed, very thick, black!55] (-1.65,4.1) -- (-1.65,-2.2) node[below, font=\scriptsize]{trust boundary};
+% arrows
+\foreach \p in {org,mem,adm} \draw[ar] (\p) -- (\p |- ui.north);
+\draw[ar] (1.9,0 |- ui.south) -- node[lb]{signed transactions, view calls} (1.9,0 |- fac.north);
+\draw[ar] (-3.3,0 |- ui.south) -- node[lb]{upload, download, re hash terms} (-3.3,0 |- ipfs.north);
+\draw[ar] (-6.35,0 |- ui.south) |- node[lb, pos=0.3, rotate=90, yshift=5pt]{HTTP API} (idx.west);
+\draw[ar, dashed] (circ.west) -- node[lb]{events (read only)} (idx.east);
+\draw[ar] (noti) -- (idx);
+\draw[ar] (keep.east) -- node[lb, pos=0.45]{public calls} (-0.95,-1.3) -- (-0.95,1.2) -- (circ.west |- 0,1.2);
+\draw[ar] (fac) -- node[lb, right]{clone} (circ);
+\draw[ar, dashed] (circ) -- node[lb, below=1pt]{delegates} (impl);
+\draw[ar] (circ.north east) -- node[lb, below right, inner sep=0pt]{} (tok.south west);
+\draw[ar] (circ.south) ++(-0.7,0) -- (vault.north);
+\draw[ar] (circ.south) ++(0.3,0) -- (order.north);
+\draw[ar] (circ.south) ++(1.2,0) -- (rep.north);
+\end{tikzpicture}
+\caption{Architecture: seven contracts, four off chain services, one browser app (blue: on chain, amber: off chain)}
+\label{fig:architecture}
+\end{figure}
+
+\subsection{Contracts and inheritance}
+\code{Circle} inherits the shared lifecycle base, which in turn inherits OpenZeppelin's
+\code{Initializable}, \code{AccessControl}, \code{Pausable} and \code{ReentrancyGuard}
+\cite{openzeppelin}. The shared modules are composed, not inherited: the factory registers every new
+circle with the vault, the draw and the registry, and those modules accept writes only from addresses
+holding \code{CIRCLE\_ROLE} (Figure~\ref{fig:contracts}).
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  cl/.style={draw=boxline, align=center, font=\small, minimum height=0.85cm, minimum width=2.75cm, fill=white, inner sep=3pt},
+  oz/.style={cl, fill=ozgray, font=\footnotesize},
+  inh/.style={-{Triangle[open,length=2.6mm,width=2.4mm]}, thick},
+  use/.style={-{Stealth[length=2mm]}, draw=black!70},
+  lb/.style={font=\scriptsize, align=center, fill=white, inner sep=1pt}]
+\node[oz] (ini) at (-4.8,4.2) {Initializable};
+\node[oz] (ac) at (-1.6,4.2) {AccessControl};
+\node[oz] (pa) at (1.6,4.2) {Pausable};
+\node[oz] (rg) at (4.8,4.2) {ReentrancyGuard};
+\node[cl, minimum width=12.6cm, fill=tintviolet] (base) at (0,2.6) {\textit{BaseCircleLifecycle} (abstract): state machine, roles, bounded pause, reentrancy guard, initializer};
+\node[cl, minimum width=4.6cm, line width=1pt, fill=tintblue] (circle) at (0.6,1.0) {\textbf{Circle}\\[-1pt]{\scriptsize join, contribute, settle, claim, cancel}};
+\node[cl, fill=tintamber] (fac) at (-4.9,1.0) {\textbf{CircleFactory}\\[-1pt]{\scriptsize EIP 1167 clones}};
+\node[cl, fill=tintteal] (vault) at (-4.4,-1.2) {\textbf{CollateralVault}\\[-1pt]{\scriptsize deposit, release, slash}};
+\node[cl, fill=tintteal] (order) at (-1.0,-1.2) {\textbf{PayoutOrder}\\[-1pt]{\scriptsize commit, reveal, finalize}};
+\node[cl, fill=tintteal] (rep) at (2.4,-1.2) {\textbf{ReputationRegistry}\\[-1pt]{\scriptsize joins, completions, defaults}};
+\node[cl, fill=tintgreen] (tok) at (5.6,-1.2) {\textbf{MockStablecoin}\\[-1pt]{\scriptsize ERC20, 6 decimals}};
+\foreach \x in {ini,ac,pa,rg} \draw[inh] (\x.south) -- (\x.south |- base.north);
+\draw[inh] (circle.north) -- (circle.north |- base.south);
+\draw[use] (fac) -- node[lb, above, yshift=2pt]{clones} (circle);
+\draw[use] (circle.south) ++(-1.8,0) -- node[lb, pos=0.5]{CIRCLE\_ROLE} (vault.north);
+\draw[use] (circle.south) ++(-0.8,0) -- (order.north);
+\draw[use] (circle.south) ++(0.9,0) -- (rep.north);
+\draw[use] (circle.south) ++(1.9,0) -- node[lb, pos=0.5]{transfers} (tok.north);
+\draw[use, dashed] (fac.south) -- node[lb, left]{registers} (vault.north west);
+\end{tikzpicture}
+\caption{Inheritance (open triangles) and calls between contracts (arrows)}
+\label{fig:contracts}
+\end{figure}
+
+\begin{table}[H]
+\centering\small
+\caption{The seven contracts}
+\label{tab:contracts}
+\begin{tabularx}{\textwidth}{@{}P{3.6cm}P{2cm}L@{}}
+\toprule
+Contract & Kind & Responsibility \\
+\midrule
+\code{BaseCircleLifecycle} & abstract & Lifecycle enum and transition guards; organizer, member and pauser roles; bounded pause whose time extends the round deadline; reentrancy guard; initializer instead of constructor. \\
+\code{Circle} & clone & One committee: join, contribute, settle each round, pay out, handle defaults, complete or cancel. \\
+\code{CircleFactory} & contract & Deploys one \code{Circle} implementation and creates every circle as a 45 byte EIP 1167 clone, initialized and registered in the same transaction. \\
+\code{CollateralVault} & contract & Holds every deposit, keyed by (circle, member); computes the position based amount; deposit, release and slash for registered circles only. \\
+\code{PayoutOrder} & contract & Commit and reveal draw; non revealers are left out; the shuffle seed is fixed by the block holding the last reveal. \\
+\code{ReputationRegistry} & contract & Counts joins, completions and defaults per address across circles; a circle can refuse members with past defaults. History is emitted as events. \\
+\code{MockStablecoin} & contract & Test ERC20 with 6 decimals and a public faucet. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{On chain versus off chain data}
+\label{sec:datamap}
+The rule is that contract correctness never depends on an off chain service. Table~\ref{tab:datamap}
+lists where each piece of data lives and why.
+
+\begin{table}[H]
+\centering\small
+\caption{Data map}
+\label{tab:datamap}
+\begin{tabularx}{\textwidth}{@{}P{3.4cm}P{3.4cm}L@{}}
+\toprule
+Data & Where & Why, and how integrity is kept \\
+\midrule
+Deposits & On chain: \code{CollateralVault} & Money is held by code; only registered circles can move it. \\
+Contributions, pots, credits & On chain: \code{Circle} & Pull payments behind a reentrancy guard. \\
+Rules (amount, size, durations, join rule) & On chain: \code{Circle} configuration & Set once in \code{initialize}; cannot change after people join. \\
+State, round, who paid & On chain & Decides who may do what. \\
+Commitments, reveals, order & On chain: \code{PayoutOrder} & Fairness must be checkable by every member. \\
+Reputation counters & On chain: \code{ReputationRegistry} & Shared across circles; only registered circles write. \\
+Terms document & Off chain: IPFS store & Large and human readable; only its CID is on chain and the browser re hashes the download. \\
+Display names & Off chain: indexer database & Personal data never goes on chain; each name is signed by the member's wallet. \\
+History, lists, reminders & Off chain: indexer and notifier & Convenience; rebuilt from events at any time; the UI falls back to the chain. \\
+Draw secret before reveal & Member's browser & Must stay secret; checked against the on chain commitment before reveal. \\
+Private keys & Never stored by us & Wallet only; no keys in the repository. \\
+\bottomrule
+\end{tabularx}
+\end{table}

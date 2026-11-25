@@ -1,0 +1,260 @@
+[
+ {
+  "inputs": [
+   {
+    "internalType": "contract IERC20",
+    "name": "token_",
+    "type": "address"
+   },
+   {
+    "internalType": "contract ICollateralVault",
+    "name": "vault_",
+    "type": "address"
+   },
+   {
+    "internalType": "contract IPayoutOrder",
+    "name": "payoutOrder_",
+    "type": "address"
+   },
+   {
+    "internalType": "contract IReputationRegistry",
+    "name": "reputation_",
+    "type": "address"
+   },
+   {
+    "internalType": "address",
+    "name": "admin_",
+    "type": "address"
+   }
+  ],
+  "stateMutability": "nonpayable",
+  "type": "constructor"
+ },
+ {
+  "anonymous": false,
+  "inputs": [
+   {
+    "indexed": true,
+    "internalType": "address",
+    "name": "circle",
+    "type": "address"
+   },
+   {
+    "indexed": true,
+    "internalType": "address",
+    "name": "organizer",
+    "type": "address"
+   },
+   {
+    "indexed": false,
+    "internalType": "uint256",
+    "name": "contribution",
+    "type": "uint256"
+   },
+   {
+    "indexed": false,
+    "internalType": "uint256",
+    "name": "groupSize",
+    "type": "uint256"
+   },
+   {
+    "indexed": false,
+    "internalType": "string",
+    "name": "termsCid",
+    "type": "string"
+   }
+  ],
+  "name": "CircleCreated",
+  "type": "event"
+ },
+ {
+  "inputs": [],
+  "name": "admin",
+  "outputs": [
+   {
+    "internalType": "address",
+    "name": "",
+    "type": "address"
+   }
+  ],
+  "stateMutability": "view",
+  "type": "function"
+ },
+ {
+  "inputs": [],
+  "name": "circleCount",
+  "outputs": [
+   {
+    "internalType": "uint256",
+    "name": "",
+    "type": "uint256"
+   }
+  ],
+  "stateMutability": "view",
+  "type": "function"
+ },
+ {
+  "inputs": [
+   {
+    "components": [
+     {
+      "internalType": "uint256",
+      "name": "contribution",
+      "type": "uint256"
+     },
+     {
+      "internalType": "uint256",
+      "name": "groupSize",
+      "type": "uint256"
+     },
+     {
+      "internalType": "uint256",
+      "name": "roundDuration",
+      "type": "uint256"
+     },
+     {
+      "internalType": "uint256",
+      "name": "gracePeriod",
+      "type": "uint256"
+     },
+     {
+      "internalType": "uint256",
+      "name": "joinDuration",
+      "type": "uint256"
+     },
+     {
+      "internalType": "uint256",
+      "name": "drawPhaseDuration",
+      "type": "uint256"
+     },
+     {
+      "internalType": "uint256",
+      "name": "maxDefaults",
+      "type": "uint256"
+     },
+     {
+      "internalType": "string",
+      "name": "termsCid",
+      "type": "string"
+     }
+    ],
+    "internalType": "struct Circle.Config",
+    "name": "cfg",
+    "type": "tuple"
+   }
+  ],
+  "name": "createCircle",
+  "outputs": [
+   {
+    "internalType": "address",
+    "name": "circle",
+    "type": "address"
+   }
+  ],
+  "stateMutability": "nonpayable",
+  "type": "function"
+ },
+ {
+  "inputs": [],
+  "name": "getCircles",
+  "outputs": [
+   {
+    "internalType": "address[]",
+    "name": "",
+    "type": "address[]"
+   }
+  ],
+  "stateMutability": "view",
+  "type": "function"
+ },
+ {
+  "inputs": [
+   {
+    "internalType": "address",
+    "name": "organizer",
+    "type": "address"
+   }
+  ],
+  "name": "getCirclesByOrganizer",
+  "outputs": [
+   {
+    "internalType": "address[]",
+    "name": "",
+    "type": "address[]"
+   }
+  ],
+  "stateMutability": "view",
+  "type": "function"
+ },
+ {
+  "inputs": [
+   {
+    "internalType": "address",
+    "name": "",
+    "type": "address"
+   }
+  ],
+  "name": "isCircle",
+  "outputs": [
+   {
+    "internalType": "bool",
+    "name": "",
+    "type": "bool"
+   }
+  ],
+  "stateMutability": "view",
+  "type": "function"
+ },
+ {
+  "inputs": [],
+  "name": "payoutOrder",
+  "outputs": [
+   {
+    "internalType": "contract IPayoutOrder",
+    "name": "",
+    "type": "address"
+   }
+  ],
+  "stateMutability": "view",
+  "type": "function"
+ },
+ {
+  "inputs": [],
+  "name": "reputation",
+  "outputs": [
+   {
+    "internalType": "contract IReputationRegistry",
+    "name": "",
+    "type": "address"
+   }
+  ],
+  "stateMutability": "view",
+  "type": "function"
+ },
+ {
+  "inputs": [],
+  "name": "token",
+  "outputs": [
+   {
+    "internalType": "contract IERC20",
+    "name": "",
+    "type": "address"
+   }
+  ],
+  "stateMutability": "view",
+  "type": "function"
+ },
+ {
+  "inputs": [],
+  "name": "vault",
+  "outputs": [
+   {
+    "internalType": "contract ICollateralVault",
+    "name": "",
+    "type": "address"
+   }
+  ],
+  "stateMutability": "view",
+  "type": "function"
+ }
+]

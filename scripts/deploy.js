@@ -27,6 +27,14 @@ async function deployAll() {
   await (await payoutOrder.grantRole(await payoutOrder.REGISTRAR_ROLE(), factoryAddr)).wait();
   await (await reputation.grantRole(await reputation.REGISTRAR_ROLE(), factoryAddr)).wait();
 
+  // Security fix S3 (Member C): with the factory registered, nobody needs the module admin role
+  // any more. Keeping it would let a stolen deployer key add a second registrar, register a fake
+  // circle and write false defaults into ReputationRegistry. Renouncing it locks the set of
+  // registrars to this factory forever. (The admin stays the circles' pauser, nothing else.)
+  for (const m of [vault, payoutOrder, reputation]) {
+    await (await m.renounceRole(await m.DEFAULT_ADMIN_ROLE(), admin.address)).wait();
+  }
+
   return { admin, token, vault, reputation, payoutOrder, factory };
 }
 

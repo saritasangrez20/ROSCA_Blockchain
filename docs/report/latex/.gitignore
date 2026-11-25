@@ -1,0 +1,11 @@
+# LaTeX build files (the report PDF is kept as docs/report/Trustless_ROSCA_Report.pdf)
+*.aux
+*.log
+*.toc
+*.lof
+*.lot
+*.out
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+main.pdf

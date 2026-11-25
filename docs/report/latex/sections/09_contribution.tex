@@ -1,0 +1,44 @@
+\section{Work Distribution}
+\label{sec:contrib}
+
+The code moved as a relay: A built the contracts, B built everything on top of them, and C hardened,
+measured and documented the result. While one member held the code, the others did work that needed no
+merged code (use case writing, wireframes, threat model draft, report skeleton). Commit history on the
+repository is the evidence.
+
+\begin{table}[H]
+\centering\small
+\caption{Contribution matrix}
+\label{tab:contrib}
+\begin{tabularx}{\textwidth}{@{}P{2.6cm}LLP{3.2cm}@{}}
+\toprule
+Member & Owned work & Evidence & Effort \\
+\midrule
+\MemberA\ (Member A) & All 7 contracts at baseline; unit, boundary and negative tests; deploy script and ABI export; architecture, inheritance and lifecycle material & Commits in \code{contracts/}, \code{test/unit}; tag \code{handoff\_1}; demo of the member flow & Largest Solidity load in 5 days; every later stage builds on it \\
+\MemberB\ (Member B) & IPFS terms store, indexer and API, notifier, keeper, full React frontend; end to end tests; README; use case, related work and data map material & Commits in \code{offchain/}, \code{frontend/}, \code{test/e2e}; tag \code{handoff\_2}; B-1 bug report and fix; demo of the organizer flow & Three runtimes in 4 days plus all integration with A's contracts \\
+\MemberC\ (Member C) & Gas baseline and four optimizations; nine attack scenarios (38 tests); three security fixes; interface guard; threat model and mitigation map; gas sheet; report assembly & Commits in \code{contracts/} (optimizations and fixes), \code{test/attacks}, \code{scripts/}, \code{docs/}; tag \code{final}; live attack and gas demo & Most marks per day (gas 10 and security 15) in 4 days; needs a deep reading of A's code \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering\small
+\caption{Rubric criteria and leads}
+\label{tab:rubric}
+\begin{tabular}{@{}lrlll@{}}
+\toprule
+Criterion & Marks & Member A & Member B & Member C \\
+\midrule
+Use case and blockchain justification & 10 & contributes & \textbf{lead} & contributes \\
+Architectural complexity and workflows & 15 & \textbf{lead} & contributes & contributes \\
+Multiple contracts and inheritance & 10 & \textbf{lead} & contributes & contributes \\
+On chain and off chain integration & 10 & contributes & \textbf{lead} & contributes \\
+Gas measurement and optimization & 10 & contributes & -- & \textbf{lead} \\
+Smart contract security & 15 & contributes & contributes & \textbf{lead} \\
+Frontend and system integration & 10 & contributes & \textbf{lead} & -- \\
+Testing, deployment and demo & 5 & contributes & \textbf{lead} & contributes \\
+Report and technical evidence & 5 & contributes & contributes & \textbf{lead} \\
+Work distribution and individual defense & 10 & own viva & own viva & own viva \\
+\bottomrule
+\end{tabular}
+\end{table}

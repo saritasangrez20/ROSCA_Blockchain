@@ -162,6 +162,9 @@ class Notifier {
 
   /** Recomputes deadline reminders. `now` is chain time in seconds. */
   async refresh(db, now) {
+    // Stage 3 (fix S1): a pause pushes the round deadline back. Events only carry the deadline
+    // at round start, so read the current one from the chain before computing reminders.
+    await this._refreshDeadlines(db);
     const active = new Set();
     const key = (acct, circle, kind, ref) => `${lc(acct)}|${circle}|${kind}|${ref}`;
     const want = (n) => {
@@ -227,6 +230,25 @@ class Notifier {
 
     // Credits that no single event announces (penalty shares, debt repayments): read the chain.
     await this._refreshCredits(db, now);
+  }
+
+  async _refreshDeadlines(db) {
+    if (!this.provider) return;
+    const updates = [];
+    for (const c of db.all("SELECT address, round_deadline FROM circles WHERE state = 2")) {
+      try {
+        const circle = new ethers.Contract(c.address, this.circleAbi, this.provider);
+        const deadline = Number(await circle.roundDeadline());
+        if (deadline !== Number(c.round_deadline)) updates.push([deadline, c.address]);
+      } catch (e) {
+        this.log.warn?.(`[notifier] could not read the deadline of ${c.address}: ${e.message}`);
+      }
+    }
+    if (updates.length) {
+      db.transaction(() => {
+        for (const u of updates) db.run("UPDATE circles SET round_deadline = ? WHERE address = ?", u);
+      });
+    }
   }
 
   async _refreshCredits(db, now) {

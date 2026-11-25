@@ -1,0 +1,42 @@
+{
+  "label": "optimized (G1 to G4)",
+  "commit": "96b4b1e",
+  "measuredAt": "2026-11-25T14:37:01.253Z",
+  "solc": "0.8.24",
+  "optimizerRuns": 200,
+  "scenario": "4 members, 1,000 mUSD per round, round 1 recipient defaults in rounds 2 to 4",
+  "gas": {
+    "createCircle": 467767,
+    "join_first": 245815,
+    "join_middle": 174615,
+    "join_last_starts_draw": 421574,
+    "commit": 54462,
+    "reveal_first": 62459,
+    "reveal_last": 45359,
+    "finalizeDraw": 400892,
+    "contribute_first_in_round": 103933,
+    "contribute_later_in_round": 69733,
+    "settleRound_allPaid": 104065,
+    "claimPayout": 42032,
+    "settleRound_oneDefault": 163007,
+    "settleRound_last_completes": 225095
+  },
+  "lifecycleTotal": 4539205,
+  "deploy": {
+    "MockStablecoin": 632230,
+    "CollateralVault": 941692,
+    "ReputationRegistry": 616968,
+    "PayoutOrder": 1351681,
+    "CircleFactory": 4735979,
+    "total": 8278550
+  },
+  "sizes": {
+    "Circle": 18836,
+    "CircleFactory": 2536,
+    "CollateralVault": 3866,
+    "PayoutOrder": 5877,
+    "ReputationRegistry": 2474,
+    "MockStablecoin": 2318,
+    "circleInstanceRuntime": 45
+  }
+}

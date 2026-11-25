@@ -14,3 +14,4 @@ frontend/dist/
 .ui-circle-url
 .env.local
 *.local
+docs/gas/latest.json

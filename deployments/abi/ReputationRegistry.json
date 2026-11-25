@@ -191,42 +191,6 @@
         "type": "address"
       }
     ],
-    "name": "getHistory",
-    "outputs": [
-      {
-        "components": [
-          {
-            "internalType": "address",
-            "name": "circle",
-            "type": "address"
-          },
-          {
-            "internalType": "enum ReputationRegistry.EntryKind",
-            "name": "kind",
-            "type": "uint8"
-          },
-          {
-            "internalType": "uint256",
-            "name": "timestamp",
-            "type": "uint256"
-          }
-        ],
-        "internalType": "struct ReputationRegistry.HistoryEntry[]",
-        "name": "",
-        "type": "tuple[]"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "member",
-        "type": "address"
-      }
-    ],
     "name": "getRecord",
     "outputs": [
       {

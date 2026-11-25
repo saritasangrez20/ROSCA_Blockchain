@@ -1,0 +1,119 @@
+
+
+  Attack A6: admin pause abuse
+    1) pausing through the payment deadline no longer forces members into default
+    2) a pause that runs out by itself also gives its full length back
+    3) the admin cannot chain pauses to freeze a circle
+    ✔ a round that had already closed before the pause can still be settled during it
+    ✔ pause never traps money: claims, the draw and cancel refunds all work while paused (133ms)
+
+  Attack A2: early recipient takes the pot and stops paying
+    ✔ slot 1 runs after its payout: honest members end exactly whole, the runner gains nothing (216ms)
+    ✔ slot 2 runs after its payout: honest members end exactly whole, the runner gains nothing (74ms)
+    ✔ slot 3 runs after its payout: honest members end exactly whole, the runner gains nothing (96ms)
+    ✔ the runner is refused by the next circle that allows no past defaults (124ms)
+
+  Attack A4: join and never pay
+    ✔ a free rider in slot 1 pays nothing: honest members end whole, the free rider never ends ahead (181ms)
+    ✔ a free rider in slot 2 pays nothing: honest members end whole, the free rider never ends ahead (66ms)
+    ✔ a free rider in slot 3 pays nothing: honest members end whole, the free rider never ends ahead (75ms)
+    ✔ a free rider in slot 4 pays nothing: honest members end whole, the free rider never ends ahead (76ms)
+    ✔ variant: join and walk away from the draw: removed, one contribution lost, circle continues (113ms)
+    ✔ limitation (documented): a defaulter's fresh address passes the reputation check; the deposit is the real protection
+
+  Attack A3: payout order rigging
+    4) the last revealer cannot reveal and finalize in one transaction to pick its slot
+    5) once the last reveal is mined the order is fixed: a later block or another caller gives the same order
+    6) grinding the finalize block does not help: an unlucky attacker stays unlucky
+    ✔ withholding a reveal removes the attacker, costs one contribution and does not cancel the circle
+    ✔ a commitment copied from the mempool cannot be revealed by the copier (322ms)
+    ✔ nobody can see a secret before every commitment is in, or commit after the window
+
+  Attack A1: payout reentrancy
+    ✔ re entering claimPayout during the payout is blocked: the attacker is paid exactly once (453ms)
+    ✔ if the attacker lets the re entry revert, the whole claim reverts and the credit is kept (50ms)
+    ✔ cross function re entry: settleRound called from inside a payout is blocked (167ms)
+    ✔ re entry while deposits are refunded (draw and completion) changes nothing; everyone ends whole (48ms)
+    ✔ residual risk (accepted): with a token that calls receivers, a member can block push refunds (188ms)
+
+  Attack A7: off chain terms tampering
+    ✔ the original document matches the CID stored on chain (119ms)
+    ✔ a one character change no longer matches, so the UI refuses it
+    ✔ nobody can change the CID after creation (no setter; initialize runs once)
+
+  Attack A5: unauthorized access and fake circles
+    ✔ a contract deployed outside the factory cannot slash, release, pull deposits, frame members or start draws (224ms)
+    7) after scripts/deploy.js nobody, not even the deployer, can register a new circle by hand
+    ✔ even a registered circle can only touch its own members' deposits
+    ✔ the organizer has no path to the money
+    ✔ the platform admin can pause, but cannot take or redirect money
+    8) circles are exact EIP 1167 clones of the factory's implementation, which nobody else can initialize
+
+
+  27 passing (4s)
+  8 failing
+
+  1) Attack A6: admin pause abuse
+       pausing through the payment deadline no longer forces members into default:
+     AssertionError: Expected transaction to be reverted with reason 'Circle: round still open', but it didn't revert
+      at Context.<anonymous> (test\attacks\adminPauseAbuse.test.js:29:5)
+
+  2) Attack A6: admin pause abuse
+       a pause that runs out by itself also gives its full length back:
+
+      AssertionError: expected 1796309382 to equal 1796914182.
+      + expected - actual
+
+      -1796309382
+      +1796914182
+      
+      at Context.<anonymous> (test\attacks\adminPauseAbuse.test.js:47:45)
+
+  3) Attack A6: admin pause abuse
+       the admin cannot chain pauses to freeze a circle:
+     AssertionError: Expected transaction to be reverted with reason 'Lifecycle: pause cooldown', but it didn't revert
+      at Context.<anonymous> (test\attacks\adminPauseAbuse.test.js:57:5)
+
+  4) Attack A3: payout order rigging
+       the last revealer cannot reveal and finalize in one transaction to pick its slot:
+     AssertionError: Expected transaction to be reverted with reason 'Order: finalize in a later block', but it reverted with reason 'DrawRigger: unlucky, undo'
+      at Context.<anonymous> (test\attacks\orderRigging.test.js:52:7)
+
+  5) Attack A3: payout order rigging
+       once the last reveal is mined the order is fixed: a later block or another caller gives the same order:
+     AssertionError: expected Result(4) [
+  '0x1c85638e118b37167e9298c2268758e058DdfDA0',
+  '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC',
+  '0x90F79bf6EB2c4f870365E785982E1f101E93b906',
+  '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65'
+] to deeply equal Result(4) [
+  '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65',
+  '0x1c85638e118b37167e9298c2268758e058DdfDA0',
+  '0x90F79bf6EB2c4f870365E785982E1f101E93b906',
+  '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC'
+]
+      at Context.<anonymous> (test\attacks\orderRigging.test.js:73:53)
+
+  6) Attack A3: payout order rigging
+       grinding the finalize block does not help: an unlucky attacker stays unlucky:
+     AssertionError: Expected transaction to be reverted with reason 'DrawRigger: unlucky, undo', but it didn't revert
+      at Context.<anonymous> (test\attacks\orderRigging.test.js:86:7)
+
+  7) Attack A5: unauthorized access and fake circles
+       after scripts/deploy.js nobody, not even the deployer, can register a new circle by hand:
+
+      AssertionError: expected true to equal false
+      + expected - actual
+
+      -true
+      +false
+      
+      at Context.<anonymous> (test\attacks\unauthorizedAccess.test.js:49:79)
+
+  8) Attack A5: unauthorized access and fake circles
+       circles are exact EIP 1167 clones of the factory's implementation, which nobody else can initialize:
+     TypeError: f.factory.implementation is not a function
+      at Context.<anonymous> (test\attacks\unauthorizedAccess.test.js:110:34)
+
+
+

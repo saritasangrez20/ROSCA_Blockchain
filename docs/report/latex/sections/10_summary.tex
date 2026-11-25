@@ -1,0 +1,19 @@
+\section{Summary}
+\label{sec:summary}
+
+Trustless ROSCA replaces the committee organizer's control of money with code. Contributions and
+deposits sit in contracts; deposits always cover 100\% of what a paid member still owes, so a member who
+takes the pot and disappears is paid for out of their own deposit; the payout order comes from a commit
+and reveal draw that no participant can steer; and every payment is a public event. Seven contracts,
+four off chain services and a React app implement eight workflows across a five state lifecycle, with
+off chain data (names, terms, history, reminders) kept outside the trust path.
+
+In the final stage the system was measured, optimized and attacked. Four optimizations (EIP 1167 clones,
+storage packing with immutable module addresses, a paid bitmap per round and events only reputation
+history) cut the gas of a whole 4 member circle from 9,619,893 to 4,521,109 ($-$53.0\%), creating a
+circle by 87.8\% and settling a round by 40 to 59\%, without changing any function, output or event the
+frontend and indexer use. Nine attack scenarios with 38 tests found three real problems in the handed
+over code: an admin pause could push every member into default, the last revealer could choose its
+payout slot, and the deployer kept a role that could frame members. All three are fixed and proved by
+tests that failed before and pass now; the remaining risks are stated openly. The full suite of 124 tests
+passes, and the whole stack was checked live.

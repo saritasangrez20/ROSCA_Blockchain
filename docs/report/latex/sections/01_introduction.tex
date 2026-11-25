@@ -1,0 +1,92 @@
+\section{Introduction}
+\label{sec:intro}
+
+\subsection{The problem}
+A rotating savings and credit association (ROSCA), called a \emph{committee} or \emph{kameti} in
+Pakistan, is a group of people who each pay the same amount every round. In every round one member
+receives the whole pot, until everyone has had a turn. Members paid early receive an interest free
+loan; members paid late are saving by force. Committees are widely used by low income groups in
+Pakistan \cite{mehmood2019}.
+
+Everything rests on one person, the organizer, who
+\begin{itemize}
+  \item \textbf{holds the money} between collection and payout, and can delay, divert or disappear with it;
+  \item \textbf{keeps the record} of who paid, usually in a notebook or a chat that members cannot check;
+  \item \textbf{decides the payout order}, which is valuable (an early slot is a loan) and open to favouritism;
+  \item \textbf{absorbs or hides defaults}: when a member who already took the pot stops paying, the
+        members paid late simply lose money.
+\end{itemize}
+
+\subsection{What we built}
+\emph{Trustless ROSCA} is an Ethereum decentralised application (DApp) that removes those four powers
+from the organizer. Table~\ref{tab:powers} summarises how.
+
+\begin{table}[H]
+\centering\small
+\caption{The organizer's powers and what replaces them}
+\label{tab:powers}
+\begin{tabularx}{\textwidth}{@{}P{3.3cm}L@{}}
+\toprule
+Organizer power today & In Trustless ROSCA \\
+\midrule
+Holds the pot & Contributions sit in the \code{Circle} contract and deposits in \code{CollateralVault}. No function lets the organizer, the admin or the developers move anyone else's money. \\
+Keeps the record & Every join, payment, default and payout is a public event that every member can read. \\
+Chooses the order & \code{PayoutOrder} runs a commit and reveal draw; nobody, including the last member to reveal, can pick a slot. \\
+Absorbs defaults & Each member's deposit always covers 100\% of what they still owe after their payout, so a member who takes the pot and disappears is paid for out of their own deposit. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+{\sloppy The system has seven contracts (\code{BaseCircleLifecycle}, \code{Circle},
+\code{CircleFactory}, \code{CollateralVault}, \code{PayoutOrder}, \code{ReputationRegistry} and
+\code{MockStablecoin}), four off chain services (IPFS terms store, event indexer with an HTTP API, in app notifier, keeper) and a
+React frontend. A circle goes through eight user workflows (W1 to W8) across a five stage lifecycle,
+with four roles: Organizer, Member, platform Admin (pause only) and anyone (keeper).\par}
+
+\subsection{Why a blockchain, and not a bank or a payments app}
+The obvious question is why not JazzCash, Easypaisa, a bank or a committee app.
+\begin{itemize}
+  \item \textbf{An app moves the trust problem; it does not remove it.} A company that holds the pot can
+        freeze, lose or misuse it, can be hacked, and can change its rules. Our contract holds the pot,
+        its rules cannot change after creation, and nobody can withdraw someone else's money.
+  \item \textbf{Shared state between people who do not fully trust each other.} Members need one record of
+        who paid that nobody can edit afterwards. A public chain gives every member the same
+        verifiable ledger without a trusted record keeper.
+  \item \textbf{Rules that run on deadlines.} Settlement, default handling and slashing happen in code
+        when a deadline passes, triggered by anyone. No organizer needs to be honest or awake.
+  \item \textbf{Verifiable fairness.} The payout order is derived from secrets every member contributed.
+\end{itemize}
+Blockchain is used only where it adds trust. Names, the terms document, reminders and history stay
+off chain (Section~\ref{sec:datamap}).
+
+\subsection{Objectives and scope}
+The project brief \cite{brief} asks for a justified use case, a multi contract architecture with inheritance,
+on chain and off chain integration, gas measurement with optimizations, a security analysis with
+attack tests, a working frontend, tests and a report. Our objectives were therefore:
+\begin{enumerate}
+  \item hold every token in contracts and make defaults cost the defaulter, not the group;
+  \item draw a payout order that no participant can choose;
+  \item keep personal and bulky data off chain without making correctness depend on it;
+  \item measure gas on the baseline and cut it with at least two optimizations;
+  \item attack our own system, fix what the attacks expose and document what remains.
+\end{enumerate}
+Prototype choices: a mock stablecoin with 6 decimals (so values do not swing like ETH) on a local
+Hardhat network. The guarantor role, Chainlink VRF, email or Telegram alerts and member matching
+were cut to fit 14 days and are future work (Section~\ref{sec:limits}).
+
+\subsection{How the work was organised}
+The code moved as a relay over 14 days, one member at a time, each stage ending with a git tag and a
+handoff note: Member A built the seven contracts and their unit tests (tag \code{handoff\_1});
+Member B built the off chain services and the frontend on top of them (tag \code{handoff\_2});
+Member C measured and optimized gas, attacked the system, fixed what the attacks exposed, wrote the
+threat model and assembled this report (tag \code{final}). Section~\ref{sec:contrib} gives the
+contribution matrix.
+
+\subsection{Structure of this report}
+Section~\ref{sec:related} reviews related work. Section~\ref{sec:design} presents the design:
+roles, workflows, lifecycle, collateral rule, architecture, contracts and the data map.
+Section~\ref{sec:impl} describes the implementation. Section~\ref{sec:gas} reports gas measurement
+and the four optimizations, and Section~\ref{sec:security} the threat model, attack tests and the
+three vulnerabilities found and fixed. Section~\ref{sec:testing} gives test results,
+Section~\ref{sec:limits} limitations and future work, Section~\ref{sec:contrib} the work
+distribution, and Section~\ref{sec:summary} a summary.

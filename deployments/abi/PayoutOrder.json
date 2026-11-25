@@ -414,12 +414,12 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "",
+        "name": "circle",
         "type": "address"
       },
       {
         "internalType": "address",
-        "name": "",
+        "name": "member",
         "type": "address"
       }
     ],
@@ -462,12 +462,12 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "",
+        "name": "circle",
         "type": "address"
       },
       {
         "internalType": "address",
-        "name": "",
+        "name": "member",
         "type": "address"
       }
     ],
