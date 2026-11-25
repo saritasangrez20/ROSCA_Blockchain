@@ -26,6 +26,9 @@ import {ICollateralVault, IPayoutOrder, IReputationRegistry} from "../interfaces
 ///        round result takes one slot. The four shared module addresses are immutables of the
 ///        implementation (identical for every clone of one factory), so they cost no storage.
 ///        The public getters of the baseline are kept as view functions with the same outputs.
+///      * G3 paid bitmap: who paid in a round is one uint256 per round (bit i = payout position
+///        i + 1) instead of a nested mapping of bools plus a separate counter. Paying writes one
+///        slot instead of two, and settling reads one slot instead of one per member.
 contract Circle is BaseCircleLifecycle {
     using SafeERC20 for IERC20;
 
@@ -126,8 +129,8 @@ contract Circle is BaseCircleLifecycle {
     mapping(address => MemberData) private _member;
 
     // ----- rounds -----
-    mapping(uint256 => mapping(address => bool)) public hasPaid;
-    mapping(uint256 => uint256) public paidCount;
+    /// round => bit (position - 1) set once that member has paid the round
+    mapping(uint256 => uint256) private _paidBits;
     mapping(uint256 => RoundRecord) private _rounds;
     mapping(uint256 => uint256) private _shortfall;
 
@@ -328,11 +331,14 @@ contract Circle is BaseCircleLifecycle {
     /// @notice Pay this round's contribution. Caller must approve this circle first.
     function contribute() external inState(State.Active) whenNotPaused nonReentrant onlyRole(MEMBER_ROLE) {
         uint256 r = _currentRound;
-        require(!hasPaid[r][msg.sender], "Circle: already paid this round");
+        // Every MEMBER_ROLE holder in the Active state has a payout position (non revealers
+        // lost the role in finalizeDraw), so position - 1 is a valid bit index.
+        uint256 bit = 1 << (_member[msg.sender].position - 1);
+        uint256 bits = _paidBits[r];
+        require(bits & bit == 0, "Circle: already paid this round");
         require(block.timestamp <= roundDeadline(), "Circle: round closed");
 
-        hasPaid[r][msg.sender] = true;
-        paidCount[r] += 1;
+        _paidBits[r] = bits | bit;
         uint256 c = _contribution;
         token.safeTransferFrom(msg.sender, address(this), c);
         emit ContributionMade(r, msg.sender, c);
@@ -352,18 +358,24 @@ contract Circle is BaseCircleLifecycle {
     function settleRound() external inState(State.Active) nonReentrant {
         uint256 r = _currentRound;
         uint256 n = order.length;
-        uint256 paid = paidCount[r];
-        require(paid == n || block.timestamp > roundDeadline(), "Circle: round still open");
+        uint256 bits = _paidBits[r];
+        uint256 everyone = (1 << n) - 1;
+        require(bits == everyone || block.timestamp > roundDeadline(), "Circle: round still open");
 
         address recipient = order[r - 1];
         uint256 c = _contribution;
-        uint256 pot = paid * c;
+        uint256 pot = 0;
         uint256 shortfall = 0;
 
-        if (paid < n) {
+        if (bits == everyone) {
+            pot = n * c;
+        } else {
             for (uint256 i = 0; i < n; i++) {
+                if ((bits >> i) & 1 == 1) {
+                    pot += c;
+                    continue;
+                }
                 address m = order[i];
-                if (hasPaid[r][m]) continue;
                 _member[m].defaults += 1;
                 reputation.recordDefault(m);
 
@@ -472,6 +484,21 @@ contract Circle is BaseCircleLifecycle {
         return (rr.recipient, rr.pot, _shortfall[round], rr.settled);
     }
 
+    /// @notice True when `account` has paid `round` (same output as the baseline mapping getter).
+    function hasPaid(uint256 round, address account) public view returns (bool) {
+        uint256 pos = _member[account].position;
+        return pos != 0 && (_paidBits[round] >> (pos - 1)) & 1 == 1;
+    }
+
+    /// @notice Number of members who paid `round`.
+    function paidCount(uint256 round) external view returns (uint256 count) {
+        uint256 bits = _paidBits[round];
+        while (bits != 0) {
+            count += bits & 1;
+            bits >>= 1;
+        }
+    }
+
     function currentRound() public view returns (uint256) {
         return _currentRound;
     }
@@ -547,7 +574,7 @@ contract Circle is BaseCircleLifecycle {
         v.removed = md.removed;
         v.position = md.position;
         v.collateral = vault.collateralOf(address(this), account);
-        v.paidThisRound = r > 0 && hasPaid[r][account];
+        v.paidThisRound = r > 0 && hasPaid(r, account);
         v.withdrawable = withdrawable[account];
         v.debt = debtOf[account];
         v.deficit = deficitOf[account];
