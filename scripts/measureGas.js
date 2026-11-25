@@ -6,8 +6,10 @@
 // docs/gas/gas_sheet.md compares the files.
 //
 // Usage:
-//   npx hardhat run scripts/measureGas.js
-//   GAS_OUT=docs/gas/optimized.json GAS_LABEL=optimized npx hardhat run scripts/measureGas.js
+//   npm run gas:measure                      (writes docs/gas/latest.json)
+//   GAS_OUT=docs/gas/final.json GAS_LABEL=final npx hardhat run scripts/measureGas.js
+// The recorded files (baseline.json at commit 2c63365, steps/, optimized.json, final.json) are
+// evidence for the gas sheet; the default output never overwrites them.
 //
 // Determinism: the payout order is random, so every action is chosen by payout POSITION, not by
 // account (the member in slot 1 always pays first and always defaults). The gas of each call is
@@ -153,13 +155,13 @@ async function main() {
   console.log(`Whole 4 member circle with one default (every transaction): ${lifecycleTotal} gas`);
   console.table(sizes);
 
-  const file = process.env.GAS_OUT || path.join("docs", "gas", "baseline.json");
+  const file = process.env.GAS_OUT || path.join("docs", "gas", "latest.json");
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(
     file,
     JSON.stringify(
       {
-        label: process.env.GAS_LABEL || "baseline",
+        label: process.env.GAS_LABEL || "latest",
         commit: gitCommit(),
         measuredAt: new Date().toISOString(),
         solc: "0.8.24",

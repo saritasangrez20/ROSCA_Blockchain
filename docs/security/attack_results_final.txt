@@ -1,0 +1,66 @@
+
+> rosca-blockchain@0.1.0 test:attacks
+> hardhat test test/attacks/payoutReentrancy.test.js test/attacks/earlyRecipientDefault.test.js test/attacks/orderRigging.test.js test/attacks/joinAndNeverPay.test.js test/attacks/unauthorizedAccess.test.js test/attacks/adminPauseAbuse.test.js test/attacks/termsTampering.test.js test/attacks/collusionInvariants.test.js test/attacks/limitsAndGasExhaustion.test.js
+
+
+
+  Attack A1: payout reentrancy
+    ✔ re entering claimPayout during the payout is blocked: the attacker is paid exactly once (652ms)
+    ✔ if the attacker lets the re entry revert, the whole claim reverts and the credit is kept (53ms)
+    ✔ cross function re entry: settleRound called from inside a payout is blocked (131ms)
+    ✔ re entry while deposits are refunded (draw and completion) changes nothing; everyone ends whole (41ms)
+    ✔ residual risk (accepted): with a token that calls receivers, a member can block push refunds (105ms)
+
+  Attack A2: early recipient takes the pot and stops paying
+    ✔ slot 1 runs after its payout: honest members end exactly whole, the runner gains nothing (209ms)
+    ✔ slot 2 runs after its payout: honest members end exactly whole, the runner gains nothing (88ms)
+    ✔ slot 3 runs after its payout: honest members end exactly whole, the runner gains nothing (73ms)
+    ✔ the runner is refused by the next circle that allows no past defaults (119ms)
+
+  Attack A3: payout order rigging
+    ✔ the last revealer cannot reveal and finalize in one transaction to pick its slot (141ms)
+    ✔ once the last reveal is mined the order is fixed: a later block or another caller gives the same order
+    ✔ grinding the finalize block does not help: an unlucky attacker stays unlucky (155ms)
+    ✔ withholding a reveal removes the attacker, costs one contribution and does not cancel the circle (56ms)
+    ✔ a commitment copied from the mempool cannot be revealed by the copier (325ms)
+    ✔ nobody can see a secret before every commitment is in, or commit after the window
+
+  Attack A4: join and never pay
+    ✔ a free rider in slot 1 pays nothing: honest members end whole, the free rider never ends ahead (538ms)
+    ✔ a free rider in slot 2 pays nothing: honest members end whole, the free rider never ends ahead (140ms)
+    ✔ a free rider in slot 3 pays nothing: honest members end whole, the free rider never ends ahead (107ms)
+    ✔ a free rider in slot 4 pays nothing: honest members end whole, the free rider never ends ahead (73ms)
+    ✔ variant: join and walk away from the draw: removed, one contribution lost, circle continues (179ms)
+    ✔ limitation (documented): a defaulter's fresh address passes the reputation check; the deposit is the real protection
+
+  Attack A5: unauthorized access and fake circles
+    ✔ a contract deployed outside the factory cannot slash, release, pull deposits, frame members or start draws (235ms)
+    ✔ after scripts/deploy.js nobody, not even the deployer, can register a new circle by hand (187ms)
+    ✔ even a registered circle can only touch its own members' deposits
+    ✔ the organizer has no path to the money
+    ✔ the platform admin can pause, but cannot take or redirect money
+    ✔ circles are exact EIP 1167 clones of the factory's implementation, which nobody else can initialize
+
+  Attack A6: admin pause abuse
+    ✔ pausing through the payment deadline no longer forces members into default (167ms)
+    ✔ a pause that runs out by itself also gives its full length back
+    ✔ the admin cannot chain pauses to freeze a circle
+    ✔ a round that had already closed before the pause can still be settled during it
+    ✔ pause never traps money: claims, the draw and cancel refunds all work while paused (186ms)
+
+  Attack A7: off chain terms tampering
+    ✔ the original document matches the CID stored on chain (152ms)
+    ✔ a one character change no longer matches, so the UI refuses it
+    ✔ nobody can change the CID after creation (no setter; initialize runs once)
+
+  Attack A8: colluding defaulters (random patterns, invariants)
+    ✔ 24 random default patterns: 100% cover after every payout; nothing created, lost or stuck; honest members whole (6518ms)
+
+  Attack A9: oversized settings and gas exhaustion
+    ✔ values that would not fit the packed storage are rejected instead of truncated (184ms)
+        worst case settleRound, 20 members all defaulting: 832971 gas (block limit 60000000)
+    ✔ the biggest circle (20 members) settles a round in which every member defaults far below the block limit (472ms)
+
+
+  38 passing (12s)
+

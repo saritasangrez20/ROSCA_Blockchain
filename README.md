@@ -13,12 +13,13 @@ Blockchain Empowerment Project, Fall 2026.
 | --- | --- | --- |
 | 1. Contracts, unit tests, deploy script | Member A | Complete, tag `handoff_1` (see `docs/handoff/handoff_1.md`) |
 | 2. Off chain services and frontend | Member B | Complete, tag `handoff_2` (see `docs/handoff/handoff_2.md`) |
-| 3. Gas optimization, attack tests, report | Member C | Not started |
+| 3. Gas optimization, attack tests, report | Member C | Complete, tag `final` (see `docs/handoff/final.md`) |
 
 ## Repository layout
 
 ```
-contracts/          Solidity (Member A): core/, risk/, support/, interfaces/
+contracts/          Solidity (Member A, optimized and hardened by Member C): core/, risk/, support/, interfaces/
+  test/             test only helpers for the attack tests (never deployed): HookToken, ReentrantMember, ...
 offchain/           Node.js services (Member B)
   lib/              config, chain helpers, IPFS CID code
   ipfs/             terms document store (local, optional Kubo pin)
@@ -35,13 +36,18 @@ frontend/           React + Vite + ethers v6 web app (Member B)
 test/
   unit/             contract tests (Member A)
   e2e/              end to end, indexer rebuild and off chain unit tests (Member B)
-scripts/            deploy.js, seedLocal.js, demo.js, measureGas.js
+  attacks/          attack scenarios A1 to A9 (Member C)
+  fixtures/         the ABIs as handed over, used by the interface compatibility test
+scripts/            deploy.js, seedLocal.js, demo.js, measureGas.js, gasSheet.js, storageLayout.js
 docs/
   workflows.md      every workflow mapped to contract functions
   handoff/          handoff notes and bug reports
   report/           report sections and the component diagram
   screenshots/      UI screenshots from the automated browser run
-  gas/              gas measurements
+  gas/              gas baseline, each optimization step, final numbers, gas sheet (Member C)
+  security/         threat model, mitigation map, attack test results (Member C)
+  report/latex/     the project report (LaTeX source); the PDF is docs/report/Trustless_ROSCA_Report.pdf
+  test_results.md   test counts, coverage and the live check (Member C)
 deployments/abi     ABIs for the frontend and indexer (written by deploy.js)
 ```
 
@@ -61,8 +67,10 @@ No `.env` is needed for the local demo. To change ports or settings, copy `.env.
 ## Run the tests
 
 ```bash
-npx hardhat test        # all 77 tests: 51 contract tests (A) + 26 off chain / end to end tests (B)
+npx hardhat test        # all 124 tests: 52 contract (A) + 26 off chain / end to end (B) + 46 attack and interface tests (C)
+npm run test:unit       # contract unit tests and the interface guard
 npm run test:e2e        # only Member B's tests
+npm run test:attacks    # Member C's attack scenarios A1 to A9
 npm run test:gas        # with a gas table per function
 npx hardhat coverage
 ```
@@ -146,7 +154,9 @@ three, and a second copy fails with "port already in use". A teammate's first ti
 | `npm run indexer:rebuild` | Rebuilds the indexer database from chain events (stop `npm run offchain` first) |
 | `curl http://127.0.0.1:4000/api/health` | Indexer status: last block, circles, events |
 | `npx hardhat run scripts/demo.js` | Console demo of a whole committee (Member A) |
-| `npx hardhat run scripts/measureGas.js` | Baseline gas numbers (Member A / C) |
+| `npm run gas:measure` | Gas of every call in a full 4 member circle, written to `docs/gas/latest.json` |
+| `npm run gas:sheet` | Rebuilds `docs/gas/gas_sheet.md` from the recorded measurements |
+| `npm run storage:layout` | Prints the packed storage layout of Circle, PayoutOrder and ReputationRegistry |
 
 ### Optional browser tests
 
@@ -162,18 +172,19 @@ node frontend/tests/ui-trust-checks.mjs offline  # the UI keeps working from the
 
 | Contract | Job |
 | --- | --- |
-| `BaseCircleLifecycle` | Abstract base: lifecycle state machine (Open, OrderDraw, Active, Completed, Cancelled), roles, time limited pause, reentrancy guard, initializer. Inherited by `Circle`. |
-| `Circle` | One committee: join, contribute, settle each round, pay out, handle defaults, complete or cancel. |
-| `CircleFactory` | Creates circles and registers each one with the shared modules. |
+| `BaseCircleLifecycle` | Abstract base: lifecycle state machine (Open, OrderDraw, Active, Completed, Cancelled), roles, time limited pause (paused time extends the round deadline, 7 day cooldown), reentrancy guard, initializer. Inherited by `Circle`. |
+| `Circle` | One committee: join, contribute, settle each round, pay out, handle defaults, complete or cancel. Deployed as an EIP 1167 clone. |
+| `CircleFactory` | Deploys one Circle implementation, creates every circle as a 45 byte clone of it and registers each one with the shared modules. |
 | `CollateralVault` | Holds every security deposit (always 100% of what a member still owes after payout). Only registered circles can deposit, release or slash. |
-| `PayoutOrder` | Commit then reveal draw plus fresh block randomness, so nobody can choose the payout order. |
+| `PayoutOrder` | Commit then reveal draw; the shuffle uses every secret plus the hash of the last reveal's block, and finalize must come in a later block, so nobody can choose the payout order. |
 | `ReputationRegistry` | Cross circle record of joins, completions and defaults. Used as a join rule. |
 | `MockStablecoin` | Test stablecoin (6 decimals) with a public faucet. |
 
-How they connect: the factory deploys a `Circle`, initializes it in the same transaction, and grants
-it a role on the vault, the draw and the registry. The circle then calls those modules; nothing else
-can write to them. `Circle` uses `initialize` instead of a constructor so the factory can later
-switch to cheap EIP 1167 clones without touching `Circle`.
+How they connect: the factory creates a `Circle` clone, initializes it in the same transaction, and
+grants it a role on the vault, the draw and the registry. The circle then calls those modules;
+nothing else can write to them. `Circle` uses `initialize` instead of a constructor because clones
+never run constructors. After deployment the deployer renounces the module admin role, so no other
+registrar can ever be added.
 
 ## Off chain services
 
@@ -195,20 +206,44 @@ API reference: see the header of `offchain/api/server.js`.
 * Funds never sit with the organizer. The only ways money leaves are `claimPayout` (your own credit),
   `release` (your own deposit back) and `slash` (your deposit covering your own missed payment).
 * Pull payments plus `ReentrancyGuard` and checks effects interactions on every transfer.
-* Pause stops joining and paying only, and switches itself off after 7 days. Settling, refunds and
-  withdrawals keep working, so the admin can never trap funds.
+* Pause stops joining and paying only, and switches itself off after 7 days. The time spent paused
+  is added to the round's payment deadline, so a pause can never push members into default, and a
+  new pause needs 7 days of unpaused time. Settling, refunds and withdrawals keep working, so the
+  admin can never trap funds.
 * Deposits always cover 100% of what a paid member still owes, so a member who takes the pot and
   disappears cannot leave the others short.
 * The payout order commitment is bound to the member's address. A member who never reveals is
-  removed and loses one contribution; the final seed mixes in block randomness at finalize time.
+  removed and loses one contribution. Finalize must come in a later block than the last reveal and
+  the seed uses that block's hash, so the last revealer cannot pick its slot.
+* The deployer renounces the admin role of the vault, draw and registry after registering the
+  factory, so a stolen deployer key cannot register a fake circle or write false defaults.
 * Off chain: no service can move money; terms are verified by hash in the browser; the UI falls
   back to the chain when the indexer is down; display names need a wallet signature.
-* Known issue: see `docs/handoff/bug_reports_for_A.md` (B-1).
+* B-1 (`docs/handoff/bug_reports_for_A.md`) is fixed.
+* Threat model, attack tests and the mitigation map: `docs/security/`. Every threat that can be
+  exercised locally has an attack test in `test/attacks/` (`npm run test:attacks`).
+
+## Gas
+
+Measured by `scripts/measureGas.js` on a full 4 member circle with one default (`docs/gas/gas_sheet.md`):
+
+| | Baseline | Final | Change |
+| --- | ---: | ---: | ---: |
+| `createCircle` | 4,024,450 | 489,638 | -87.8% |
+| `join` (middle member) | 251,300 | 174,597 | -30.5% |
+| `contribute` (later in round) | 95,498 | 68,132 | -28.7% |
+| `settleRound` (one default) | 315,055 | 162,286 | -48.5% |
+| Whole circle, every transaction | 9,619,893 | 4,521,109 | -53.0% |
+
+Optimizations: EIP 1167 clones (G1), storage packing and immutable module addresses (G2), one
+paid bitmap per round (G3), reputation history in events only (G4). A test
+(`test/unit/AbiCompatibility.test.js`) proves no function, output or event used by the frontend,
+indexer or keeper changed.
 
 ## Reused code
 
 * OpenZeppelin Contracts 5.0.2 (MIT): `AccessControl`, `Pausable`, `ReentrancyGuard`, `ERC20`,
-  `Ownable`, `SafeERC20`.
+  `Ownable`, `SafeERC20`, `Initializable`, `Clones`.
 * Libraries (not copied code): ethers v6, React, Vite, Express, cors, dotenv, sql.js (SQLite in
   WebAssembly), Atkinson Hyperlegible font (SIL OFL, via @fontsource).
 * Everything else in `contracts/`, `offchain/`, `frontend/`, `test/` and `scripts/` is original work.
