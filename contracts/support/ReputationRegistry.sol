@@ -18,10 +18,18 @@ contract ReputationRegistry is AccessControl {
         Defaulted
     }
 
+    /// Output shape of getRecord (unchanged from the baseline).
     struct Record {
         uint256 joined;
         uint256 completed;
         uint256 defaults;
+    }
+
+    /// Stored form: all three counters in one storage slot (gas optimization G2).
+    struct PackedRecord {
+        uint64 joined;
+        uint64 completed;
+        uint64 defaults;
     }
 
     struct HistoryEntry {
@@ -30,7 +38,7 @@ contract ReputationRegistry is AccessControl {
         uint256 timestamp;
     }
 
-    mapping(address => Record) private records;
+    mapping(address => PackedRecord) private records;
     mapping(address => HistoryEntry[]) private history;
 
     event CircleRegistered(address indexed circle);
@@ -63,7 +71,8 @@ contract ReputationRegistry is AccessControl {
     }
 
     function getRecord(address member) external view returns (Record memory) {
-        return records[member];
+        PackedRecord memory r = records[member];
+        return Record({joined: r.joined, completed: r.completed, defaults: r.defaults});
     }
 
     function getHistory(address member) external view returns (HistoryEntry[] memory) {

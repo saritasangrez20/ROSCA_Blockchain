@@ -51,7 +51,7 @@ contract CircleFactory {
         payoutOrder = payoutOrder_;
         reputation = reputation_;
         admin = admin_;
-        implementation = address(new Circle());
+        implementation = address(new Circle(token_, vault_, payoutOrder_, reputation_));
     }
 
     /// @notice W1: the caller becomes the organizer of a new circle.

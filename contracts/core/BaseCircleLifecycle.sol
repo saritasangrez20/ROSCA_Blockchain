@@ -18,6 +18,8 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 ///      Open ──(full)──> OrderDraw ──(draw ok)──> Active ──(last round)──> Completed
 ///        │                  │
 ///        └──(not filled)──> Cancelled <──(fewer than 2 revealed)
+///
+///      Gas optimization G2 (Member C): `state` and the pause expiry share one storage slot.
 abstract contract BaseCircleLifecycle is Initializable, AccessControl, Pausable, ReentrancyGuard {
     bytes32 public constant ORGANIZER_ROLE = keccak256("ORGANIZER_ROLE");
     bytes32 public constant MEMBER_ROLE = keccak256("MEMBER_ROLE");
@@ -34,8 +36,9 @@ abstract contract BaseCircleLifecycle is Initializable, AccessControl, Pausable,
         Cancelled
     }
 
+    // ----- one storage slot -----
     State public state;
-    uint256 public pauseExpiresAt;
+    uint40 private _pauseExpiresAt;
 
     event StateChanged(State indexed from, State indexed to);
 
@@ -51,22 +54,27 @@ abstract contract BaseCircleLifecycle is Initializable, AccessControl, Pausable,
         _;
     }
 
+    /// @notice When the current pause switches itself off (0 when not paused).
+    function pauseExpiresAt() public view returns (uint256) {
+        return _pauseExpiresAt;
+    }
+
     /// @notice Emergency stop for at most MAX_PAUSE_DURATION. Blocks joining and paying
     ///         only; settling, refunds and withdrawals stay open so a pause can never
     ///         trap member funds.
     function pause() external onlyRole(PAUSER_ROLE) {
         _pause();
-        pauseExpiresAt = block.timestamp + MAX_PAUSE_DURATION;
+        _pauseExpiresAt = uint40(block.timestamp + MAX_PAUSE_DURATION);
     }
 
     function unpause() external onlyRole(PAUSER_ROLE) {
         _unpause();
-        pauseExpiresAt = 0;
+        _pauseExpiresAt = 0;
     }
 
     /// @notice True only while a pause is on and has not expired.
     function paused() public view override returns (bool) {
-        return super.paused() && block.timestamp < pauseExpiresAt;
+        return super.paused() && block.timestamp < _pauseExpiresAt;
     }
 
     function _transition(State to) internal {

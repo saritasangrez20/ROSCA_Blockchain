@@ -18,11 +18,21 @@ import {ICollateralVault, IPayoutOrder, IReputationRegistry} from "../interfaces
 ///      Guarantee: once a member has received the pot, their deposit equals 100% of the
 ///      contributions they still owe, so if they stop paying the others still get full pots.
 ///      A member who misses payments before their own payout repays from their own pot.
+///
+///      Gas optimizations (Member C, Stage 3). External functions, events and view outputs are
+///      unchanged, so the indexer, keeper and frontend keep working:
+///      * G2 storage packing: the configuration, round timing and round counter fit in two
+///        slots; each member's position, removal flag and default count share one slot; a
+///        round result takes one slot. The four shared module addresses are immutables of the
+///        implementation (identical for every clone of one factory), so they cost no storage.
+///        The public getters of the baseline are kept as view functions with the same outputs.
 contract Circle is BaseCircleLifecycle {
     using SafeERC20 for IERC20;
 
     uint256 public constant MAX_MEMBERS = 20;
 
+    /// Input of `createCircle` / `initialize`, and output shape of `config()` (all uint256 so
+    /// the external signatures stay those of the baseline; stored packed, see below).
     struct Config {
         uint256 contribution; // amount each member pays per round (token units)
         uint256 groupSize; // members needed to start = number of rounds if everyone reveals
@@ -39,13 +49,6 @@ contract Circle is BaseCircleLifecycle {
         ICollateralVault vault;
         IPayoutOrder payoutOrder;
         IReputationRegistry reputation;
-    }
-
-    struct RoundResult {
-        address recipient;
-        uint256 pot;
-        uint256 shortfall;
-        bool settled;
     }
 
     /// One call summary for the frontend.
@@ -78,37 +81,60 @@ contract Circle is BaseCircleLifecycle {
         uint256 defaults;
     }
 
-    /// The factory that deployed this code. Only it may initialize a circle.
-    /// @dev Immutable, so it is part of the code itself and also holds for clones.
-    address public immutable factory;
+    /// Per member record, one storage slot.
+    struct MemberData {
+        uint8 position; // 1 based payout position, 0 = not in the order
+        bool removed; // left out of the draw for not revealing
+        uint32 defaults; // missed payments in this circle
+    }
 
-    // ----- configuration (set once in initialize) -----
-    Config public config;
-    IERC20 public token;
-    ICollateralVault public vault;
-    IPayoutOrder public payoutOrder;
-    IReputationRegistry public reputation;
+    /// Result of a settled round, one storage slot. `pot` is at most MAX_MEMBERS times a
+    /// uint64 contribution (< 2^69), so 88 bits always hold it. The shortfall is rare and
+    /// lives in its own mapping, written only when it is not zero.
+    struct RoundRecord {
+        address recipient;
+        bool settled;
+        uint88 pot;
+    }
+
+    /// The factory that deployed this code. Only it may initialize a circle.
+    /// @dev Immutables are part of the code, so they also hold for every clone.
+    address public immutable factory;
+    IERC20 public immutable token;
+    ICollateralVault public immutable vault;
+    IPayoutOrder public immutable payoutOrder;
+    IReputationRegistry public immutable reputation;
+
+    // ----- configuration, slot 1: organizer | contribution | groupSize | maxDefaults -----
     address public organizer;
-    uint256 public joinDeadline;
+    uint64 private _contribution;
+    uint8 private _groupSize;
+    uint16 private _maxDefaults;
+    // ----- configuration and timing, slot 2 -----
+    uint32 private _roundDuration;
+    uint32 private _gracePeriod;
+    uint32 private _joinDuration;
+    uint32 private _drawPhaseDuration;
+    uint40 private _joinDeadline;
+    uint40 private _roundStart;
+    uint8 private _currentRound; // 0 before Active, then 1..order.length
+    string private _termsCid; // IPFS CID of the human readable terms document
 
     // ----- membership and order -----
     address[] private members; // everyone who joined
     address[] private order; // participants in payout order; order[0] is paid in round 1
-    mapping(address => uint256) public positionOf; // 1 based, 0 = not in the order
-    mapping(address => bool) public removed; // left out of the draw for not revealing
+    mapping(address => MemberData) private _member;
 
     // ----- rounds -----
-    uint256 public currentRound; // 0 before Active, then 1..order.length
-    uint256 public roundStart;
     mapping(uint256 => mapping(address => bool)) public hasPaid;
     mapping(uint256 => uint256) public paidCount;
-    mapping(uint256 => RoundResult) public rounds;
+    mapping(uint256 => RoundRecord) private _rounds;
+    mapping(uint256 => uint256) private _shortfall;
 
-    // ----- balances and records -----
+    // ----- balances -----
     mapping(address => uint256) public withdrawable; // pull payments
     mapping(address => uint256) public debtOf; // uncovered missed payments owed by a member
     mapping(address => uint256) public deficitOf; // amount a member was shortchanged
-    mapping(address => uint256) public defaultsInCircle;
 
     event MemberJoined(address indexed member, uint256 collateral);
     event DrawStarted(uint256 phaseDuration);
@@ -124,8 +150,19 @@ contract Circle is BaseCircleLifecycle {
     event CircleCancelled(address indexed by);
     event CircleCompleted();
 
-    constructor() {
+    /// @dev Runs once, for the implementation deployed by the factory. Clones share its code
+    ///      and therefore these immutables.
+    constructor(IERC20 token_, ICollateralVault vault_, IPayoutOrder payoutOrder_, IReputationRegistry reputation_) {
+        require(
+            address(token_) != address(0) && address(vault_) != address(0) && address(payoutOrder_) != address(0)
+                && address(reputation_) != address(0),
+            "Circle: zero module"
+        );
         factory = msg.sender;
+        token = token_;
+        vault = vault_;
+        payoutOrder = payoutOrder_;
+        reputation = reputation_;
     }
 
     /// @notice Sets up a new circle. Called once, by the factory, in the same transaction
@@ -140,18 +177,30 @@ contract Circle is BaseCircleLifecycle {
         require(cfg.roundDuration > 0 && cfg.joinDuration > 0 && cfg.drawPhaseDuration > 0, "Circle: zero duration");
         require(bytes(cfg.termsCid).length > 0, "Circle: missing terms");
         require(
-            address(mods.token) != address(0) && address(mods.vault) != address(0)
-                && address(mods.payoutOrder) != address(0) && address(mods.reputation) != address(0),
-            "Circle: zero module"
+            address(mods.token) == address(token) && address(mods.vault) == address(vault)
+                && address(mods.payoutOrder) == address(payoutOrder) && address(mods.reputation) == address(reputation),
+            "Circle: wrong module"
         );
+        // Packed storage: reject values that would not fit instead of truncating them.
+        require(cfg.contribution <= type(uint64).max, "Circle: contribution too large");
+        require(
+            cfg.roundDuration <= type(uint32).max && cfg.gracePeriod <= type(uint32).max
+                && cfg.joinDuration <= type(uint32).max && cfg.drawPhaseDuration <= type(uint32).max,
+            "Circle: duration too long"
+        );
+        require(cfg.maxDefaults <= type(uint16).max, "Circle: max defaults too large");
+
         __BaseCircleLifecycle_init(organizer_, pauser_);
-        config = cfg;
-        token = mods.token;
-        vault = mods.vault;
-        payoutOrder = mods.payoutOrder;
-        reputation = mods.reputation;
         organizer = organizer_;
-        joinDeadline = block.timestamp + cfg.joinDuration;
+        _contribution = uint64(cfg.contribution);
+        _groupSize = uint8(cfg.groupSize);
+        _maxDefaults = uint16(cfg.maxDefaults);
+        _roundDuration = uint32(cfg.roundDuration);
+        _gracePeriod = uint32(cfg.gracePeriod);
+        _joinDuration = uint32(cfg.joinDuration);
+        _drawPhaseDuration = uint32(cfg.drawPhaseDuration);
+        _joinDeadline = uint40(block.timestamp + cfg.joinDuration);
+        _termsCid = cfg.termsCid;
     }
 
     // =====================================================================
@@ -161,28 +210,30 @@ contract Circle is BaseCircleLifecycle {
     /// @notice Collateral every member locks when joining (the amount slot 1 needs).
     ///         The excess is refunded once the draw fixes each member's position.
     function joinCollateral() public view returns (uint256) {
-        return vault.requiredCollateral(config.contribution, config.groupSize, 1);
+        return vault.requiredCollateral(_contribution, _groupSize, 1);
     }
 
     /// @notice Join the circle. Caller must first approve the vault for joinCollateral().
     function join() external inState(State.Open) whenNotPaused nonReentrant {
-        require(block.timestamp <= joinDeadline, "Circle: joining closed");
+        require(block.timestamp <= _joinDeadline, "Circle: joining closed");
         require(!hasRole(MEMBER_ROLE, msg.sender), "Circle: already a member");
-        require(members.length < config.groupSize, "Circle: full");
-        require(reputation.isEligible(msg.sender, config.maxDefaults), "Circle: too many past defaults");
+        uint256 size = _groupSize;
+        require(members.length < size, "Circle: full");
+        require(reputation.isEligible(msg.sender, _maxDefaults), "Circle: too many past defaults");
 
         _grantRole(MEMBER_ROLE, msg.sender);
         members.push(msg.sender);
 
-        uint256 collateral = joinCollateral();
+        uint256 collateral = vault.requiredCollateral(_contribution, size, 1);
         vault.deposit(msg.sender, msg.sender, collateral);
         reputation.recordJoin(msg.sender);
         emit MemberJoined(msg.sender, collateral);
 
-        if (members.length == config.groupSize) {
+        if (members.length == size) {
             _transition(State.OrderDraw);
-            payoutOrder.startDraw(members, config.drawPhaseDuration);
-            emit DrawStarted(config.drawPhaseDuration);
+            uint256 phase = _drawPhaseDuration;
+            payoutOrder.startDraw(members, phase);
+            emit DrawStarted(phase);
         }
     }
 
@@ -194,7 +245,8 @@ contract Circle is BaseCircleLifecycle {
     ///         once the join deadline has passed without the circle filling up.
     function cancel() external inState(State.Open) nonReentrant {
         require(
-            hasRole(ORGANIZER_ROLE, msg.sender) || block.timestamp > joinDeadline, "Circle: only organizer before deadline"
+            hasRole(ORGANIZER_ROLE, msg.sender) || block.timestamp > _joinDeadline,
+            "Circle: only organizer before deadline"
         );
         _cancelAndRefund();
     }
@@ -210,50 +262,55 @@ contract Circle is BaseCircleLifecycle {
     ///      deposit is returned, and a default is recorded. The circle continues with the
     ///      remaining members; it is only cancelled if fewer than two revealed.
     function finalizeDraw() external inState(State.OrderDraw) nonReentrant {
+        // `drawn` holds exactly the members who revealed, in payout order.
         address[] memory drawn = payoutOrder.finalize();
+        uint256 n = drawn.length;
         // B-1: the penalty for not revealing is shared among the members who revealed.
         // If nobody revealed there is nobody to share it with, so no penalty is taken:
         // otherwise the slashed tokens would stay in this cancelled circle forever.
-        bool anyoneRevealed = drawn.length > 0;
+        bool anyoneRevealed = n > 0;
+        uint256 c = _contribution;
 
         uint256 penaltyPool = 0;
-        for (uint256 i = 0; i < members.length; i++) {
+        uint256 total = members.length;
+        for (uint256 i = 0; i < total; i++) {
             address m = members[i];
-            if (payoutOrder.hasRevealed(address(this), m)) continue;
-            removed[m] = true;
+            // Read the reveal set from `drawn` in memory instead of one external call per member.
+            if (_contains(drawn, m)) continue;
+            MemberData storage md = _member[m];
+            md.removed = true;
+            md.defaults += 1;
             _revokeRole(MEMBER_ROLE, m);
-            defaultsInCircle[m] += 1;
             reputation.recordDefault(m);
-            uint256 penalty = anyoneRevealed ? vault.slash(m, config.contribution) : 0;
+            uint256 penalty = anyoneRevealed ? vault.slash(m, c) : 0;
             penaltyPool += penalty;
             vault.release(m, type(uint256).max);
             emit MemberRemoved(m, penalty);
         }
 
-        if (penaltyPool > 0 && drawn.length > 0) {
-            uint256 share = penaltyPool / drawn.length;
-            for (uint256 i = 0; i < drawn.length; i++) {
+        if (penaltyPool > 0 && n > 0) {
+            uint256 share = penaltyPool / n;
+            for (uint256 i = 0; i < n; i++) {
                 withdrawable[drawn[i]] += share;
             }
-            withdrawable[drawn[0]] += penaltyPool - share * drawn.length; // rounding dust
+            withdrawable[drawn[0]] += penaltyPool - share * n; // rounding dust
         }
 
-        if (drawn.length < 2) {
+        if (n < 2) {
             _cancelAndRefund();
             return;
         }
 
-        uint256 n = drawn.length;
         for (uint256 i = 0; i < n; i++) {
             order.push(drawn[i]);
-            positionOf[drawn[i]] = i + 1;
+            _member[drawn[i]].position = uint8(i + 1);
         }
         emit PayoutOrderSet(drawn);
 
         // Later positions owe less after their payout, so they need less collateral.
         for (uint256 i = 0; i < n; i++) {
             address m = drawn[i];
-            uint256 required = vault.requiredCollateral(config.contribution, n, i + 1);
+            uint256 required = vault.requiredCollateral(c, n, i + 1);
             uint256 locked = vault.collateralOf(address(this), m);
             if (locked > required) {
                 vault.release(m, locked - required);
@@ -270,19 +327,20 @@ contract Circle is BaseCircleLifecycle {
 
     /// @notice Pay this round's contribution. Caller must approve this circle first.
     function contribute() external inState(State.Active) whenNotPaused nonReentrant onlyRole(MEMBER_ROLE) {
-        uint256 r = currentRound;
+        uint256 r = _currentRound;
         require(!hasPaid[r][msg.sender], "Circle: already paid this round");
         require(block.timestamp <= roundDeadline(), "Circle: round closed");
 
         hasPaid[r][msg.sender] = true;
         paidCount[r] += 1;
-        token.safeTransferFrom(msg.sender, address(this), config.contribution);
-        emit ContributionMade(r, msg.sender, config.contribution);
+        uint256 c = _contribution;
+        token.safeTransferFrom(msg.sender, address(this), c);
+        emit ContributionMade(r, msg.sender, c);
     }
 
     /// @notice Last moment a payment for the current round is accepted.
     function roundDeadline() public view returns (uint256) {
-        return roundStart + config.roundDuration + config.gracePeriod;
+        return uint256(_roundStart) + _roundDuration + _gracePeriod;
     }
 
     // =====================================================================
@@ -292,35 +350,39 @@ contract Circle is BaseCircleLifecycle {
     /// @notice Closes the current round: covers missed payments from deposits, credits the
     ///         pot to this round's recipient and starts the next round.
     function settleRound() external inState(State.Active) nonReentrant {
-        uint256 r = currentRound;
+        uint256 r = _currentRound;
         uint256 n = order.length;
-        require(paidCount[r] == n || block.timestamp > roundDeadline(), "Circle: round still open");
+        uint256 paid = paidCount[r];
+        require(paid == n || block.timestamp > roundDeadline(), "Circle: round still open");
 
         address recipient = order[r - 1];
-        uint256 pot = paidCount[r] * config.contribution;
+        uint256 c = _contribution;
+        uint256 pot = paid * c;
         uint256 shortfall = 0;
 
-        for (uint256 i = 0; i < n; i++) {
-            address m = order[i];
-            if (hasPaid[r][m]) continue;
-            defaultsInCircle[m] += 1;
-            reputation.recordDefault(m);
+        if (paid < n) {
+            for (uint256 i = 0; i < n; i++) {
+                address m = order[i];
+                if (hasPaid[r][m]) continue;
+                _member[m].defaults += 1;
+                reputation.recordDefault(m);
 
-            if (m == recipient) {
-                // Missing your own payout round only shrinks your own pot.
-                emit MemberDefaulted(r, m, 0, 0);
-                continue;
+                if (m == recipient) {
+                    // Missing your own payout round only shrinks your own pot.
+                    emit MemberDefaulted(r, m, 0, 0);
+                    continue;
+                }
+                uint256 covered = vault.slash(m, c);
+                uint256 uncovered = c - covered;
+                pot += covered;
+                if (uncovered > 0) {
+                    // Only possible before the defaulter's own payout: repaid from their pot later.
+                    shortfall += uncovered;
+                    debtOf[m] += uncovered;
+                    deficitOf[recipient] += uncovered;
+                }
+                emit MemberDefaulted(r, m, covered, uncovered);
             }
-            uint256 covered = vault.slash(m, config.contribution);
-            uint256 uncovered = config.contribution - covered;
-            pot += covered;
-            if (uncovered > 0) {
-                // Only possible before the defaulter's own payout: repaid from their pot later.
-                shortfall += uncovered;
-                debtOf[m] += uncovered;
-                deficitOf[recipient] += uncovered;
-            }
-            emit MemberDefaulted(r, m, covered, uncovered);
         }
 
         // 1. If the recipient owes money from earlier defaults, repay it out of their pot first.
@@ -335,7 +397,7 @@ contract Circle is BaseCircleLifecycle {
 
         // 2. If earlier defaults used up part of the recipient's deposit, refill it from their
         //    pot so it again covers 100% of what they still owe after being paid.
-        uint256 required = vault.requiredCollateral(config.contribution, n, r);
+        uint256 required = vault.requiredCollateral(c, n, r);
         uint256 locked = vault.collateralOf(address(this), recipient);
         if (locked < required && pot > 0) {
             uint256 refill = required - locked > pot ? pot : required - locked;
@@ -346,7 +408,8 @@ contract Circle is BaseCircleLifecycle {
         }
 
         withdrawable[recipient] += pot;
-        rounds[r] = RoundResult({recipient: recipient, pot: pot, shortfall: shortfall, settled: true});
+        _rounds[r] = RoundRecord({recipient: recipient, settled: true, pot: uint88(pot)});
+        if (shortfall > 0) _shortfall[r] = shortfall;
         emit RoundSettled(r, recipient, pot, shortfall);
 
         if (r == n) {
@@ -371,8 +434,69 @@ contract Circle is BaseCircleLifecycle {
     }
 
     // =====================================================================
-    // Views for the frontend and indexer
+    // Views for the frontend and indexer (same outputs as the baseline getters)
     // =====================================================================
+
+    function config()
+        external
+        view
+        returns (
+            uint256 contribution,
+            uint256 groupSize,
+            uint256 roundDuration,
+            uint256 gracePeriod,
+            uint256 joinDuration,
+            uint256 drawPhaseDuration,
+            uint256 maxDefaults,
+            string memory termsCid
+        )
+    {
+        return (
+            _contribution,
+            _groupSize,
+            _roundDuration,
+            _gracePeriod,
+            _joinDuration,
+            _drawPhaseDuration,
+            _maxDefaults,
+            _termsCid
+        );
+    }
+
+    function rounds(uint256 round)
+        external
+        view
+        returns (address recipient, uint256 pot, uint256 shortfall, bool settled)
+    {
+        RoundRecord memory rr = _rounds[round];
+        return (rr.recipient, rr.pot, _shortfall[round], rr.settled);
+    }
+
+    function currentRound() public view returns (uint256) {
+        return _currentRound;
+    }
+
+    function roundStart() external view returns (uint256) {
+        return _roundStart;
+    }
+
+    function joinDeadline() external view returns (uint256) {
+        return _joinDeadline;
+    }
+
+    /// @notice 1 based payout position, 0 = not in the order.
+    function positionOf(address account) external view returns (uint256) {
+        return _member[account].position;
+    }
+
+    /// @notice True for a member left out of the draw for not revealing.
+    function removed(address account) external view returns (bool) {
+        return _member[account].removed;
+    }
+
+    function defaultsInCircle(address account) external view returns (uint256) {
+        return _member[account].defaults;
+    }
 
     function getMembers() external view returns (address[] memory) {
         return members;
@@ -397,35 +521,37 @@ contract Circle is BaseCircleLifecycle {
 
     function currentRecipient() public view returns (address) {
         if (state != State.Active) return address(0);
-        return order[currentRound - 1];
+        return order[_currentRound - 1];
     }
 
     function getSummary() external view returns (Summary memory s) {
         s.state = state;
         s.organizer = organizer;
-        s.contribution = config.contribution;
-        s.groupSize = config.groupSize;
+        s.contribution = _contribution;
+        s.groupSize = _groupSize;
         s.memberCount = members.length;
         s.participantCount = order.length;
-        s.currentRound = currentRound;
+        s.currentRound = _currentRound;
         s.roundDeadline = state == State.Active ? roundDeadline() : 0;
         s.currentRecipient = currentRecipient();
-        s.joinDeadline = joinDeadline;
+        s.joinDeadline = _joinDeadline;
         s.joinCollateral = joinCollateral();
         s.paused = paused();
-        s.termsCid = config.termsCid;
+        s.termsCid = _termsCid;
     }
 
     function getMemberInfo(address account) external view returns (MemberView memory v) {
+        MemberData memory md = _member[account];
+        uint256 r = _currentRound;
         v.isMember = hasRole(MEMBER_ROLE, account);
-        v.removed = removed[account];
-        v.position = positionOf[account];
+        v.removed = md.removed;
+        v.position = md.position;
         v.collateral = vault.collateralOf(address(this), account);
-        v.paidThisRound = currentRound > 0 && hasPaid[currentRound][account];
+        v.paidThisRound = r > 0 && hasPaid[r][account];
         v.withdrawable = withdrawable[account];
         v.debt = debtOf[account];
         v.deficit = deficitOf[account];
-        v.defaults = defaultsInCircle[account];
+        v.defaults = md.defaults;
     }
 
     // =====================================================================
@@ -433,15 +559,16 @@ contract Circle is BaseCircleLifecycle {
     // =====================================================================
 
     function _startRound(uint256 r) private {
-        currentRound = r;
-        roundStart = block.timestamp;
+        _currentRound = uint8(r);
+        _roundStart = uint40(block.timestamp);
         emit RoundStarted(r, order[r - 1], roundDeadline());
     }
 
     /// W7  Complete: settle any leftover debt from deposits, release the rest, update reputation.
     function _complete() private {
         _transition(State.Completed);
-        for (uint256 i = 0; i < order.length; i++) {
+        uint256 n = order.length;
+        for (uint256 i = 0; i < n; i++) {
             address m = order[i];
             uint256 debt = debtOf[m];
             if (debt > 0) {
@@ -453,10 +580,10 @@ contract Circle is BaseCircleLifecycle {
                 }
             }
         }
-        for (uint256 i = 0; i < order.length; i++) {
+        for (uint256 i = 0; i < n; i++) {
             address m = order[i];
             vault.release(m, type(uint256).max);
-            if (defaultsInCircle[m] == 0) {
+            if (_member[m].defaults == 0) {
                 reputation.recordCompletion(m);
             }
         }
@@ -465,7 +592,8 @@ contract Circle is BaseCircleLifecycle {
 
     /// Hands recovered money to members who were shortchanged, in payout order.
     function _payCreditors(uint256 amount) private {
-        for (uint256 i = 0; i < order.length && amount > 0; i++) {
+        uint256 n = order.length;
+        for (uint256 i = 0; i < n && amount > 0; i++) {
             address m = order[i];
             uint256 deficit = deficitOf[m];
             if (deficit == 0) continue;
@@ -478,9 +606,17 @@ contract Circle is BaseCircleLifecycle {
 
     function _cancelAndRefund() private {
         _transition(State.Cancelled);
-        for (uint256 i = 0; i < members.length; i++) {
+        uint256 total = members.length;
+        for (uint256 i = 0; i < total; i++) {
             vault.release(members[i], type(uint256).max);
         }
         emit CircleCancelled(msg.sender);
+    }
+
+    function _contains(address[] memory list, address who) private pure returns (bool) {
+        for (uint256 i = 0; i < list.length; i++) {
+            if (list[i] == who) return true;
+        }
+        return false;
     }
 }

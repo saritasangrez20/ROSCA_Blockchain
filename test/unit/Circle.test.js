@@ -56,13 +56,14 @@ describe("Circle: setup (initializer)", function () {
 
   it("only the deploying factory can initialize a circle", async function () {
     const { token, vault, payoutOrder, reputation, outsider } = await loadFixture(openFixture);
-    const fresh = await ethers.deployContract("Circle"); // deployed by the test account, not by outsider
     const mods = {
       token: await token.getAddress(),
       vault: await vault.getAddress(),
       payoutOrder: await payoutOrder.getAddress(),
       reputation: await reputation.getAddress(),
     };
+    // deployed by the test account, not by outsider (Stage 3: module addresses are constructor immutables)
+    const fresh = await ethers.deployContract("Circle", [mods.token, mods.vault, mods.payoutOrder, mods.reputation]);
     await expect(
       fresh.connect(outsider).initialize(defaultConfig(), mods, outsider.address, outsider.address)
     ).to.be.revertedWith("Circle: only factory");
