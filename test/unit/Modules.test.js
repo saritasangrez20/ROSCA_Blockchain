@@ -91,16 +91,22 @@ describe("ReputationRegistry", function () {
     );
   });
 
-  it("records joins with history and reports eligibility", async function () {
+  it("records joins (counters on chain, history as events) and reports eligibility", async function () {
     const { reputation, factory, organizer, token, vault, alice, bob } = await loadFixture(systemFixture);
     const circle = await createCircle(factory, organizer, { groupSize: 3n });
-    await joinAll(circle, token, vault, [alice, bob]);
+    const circleAddr = await circle.getAddress();
+    await token.connect(alice).approve(await vault.getAddress(), await circle.joinCollateral());
+    // Stage 3 (gas G4): the history entry is the ReputationUpdated event; the indexer stores it.
+    await expect(circle.connect(alice).join())
+      .to.emit(reputation, "ReputationUpdated")
+      .withArgs(alice.address, circleAddr, 0); // EntryKind.Joined
+    await joinAll(circle, token, vault, [bob]);
     const rec = await reputation.getRecord(alice.address);
     expect(rec.joined).to.equal(1n);
     expect(rec.defaults).to.equal(0n);
-    const hist = await reputation.getHistory(alice.address);
-    expect(hist.length).to.equal(1);
-    expect(hist[0].circle).to.equal(await circle.getAddress());
+    const events = await reputation.queryFilter(reputation.filters.ReputationUpdated(alice.address));
+    expect(events.length).to.equal(1);
+    expect(events[0].args.circle).to.equal(circleAddr);
     expect(await reputation.isEligible(alice.address, 0)).to.equal(true);
   });
 });
