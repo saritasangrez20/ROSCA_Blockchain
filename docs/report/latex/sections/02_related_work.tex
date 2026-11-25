@@ -1,0 +1,43 @@
+\section{Related Work}
+\label{sec:related}
+
+Table~\ref{tab:related} compares the closest work with ours. We do not claim to be the first
+blockchain ROSCA; our contribution is collateral scaled to payout position with automatic slashing,
+a payout draw that resists rigging, an explicit threat model backed by attack tests, and measured
+gas savings.
+
+\begin{table}[H]
+\centering\small
+\caption{Related work and how this project differs}
+\label{tab:related}
+\begin{tabularx}{\textwidth}{@{}P{3.6cm}LL@{}}
+\toprule
+Work & What it does & How we differ \\
+\midrule
+Sharma and Chandrakar (2025) \cite{sharma2025} &
+Scores the trustworthiness of ROSCA \emph{operators} with fuzzy logic and stores a time stamped trust
+index on a permissioned blockchain, with a key agreement protocol. &
+They keep an operator and rate it; we remove the operator's control of money. Their trust index
+idea appears as our \code{ReputationRegistry}, on a public chain. \\
+Sharma and Chandrakar (2024), TruChit \cite{sharma2024} &
+A blockchain chit fund (ROSCA) with a machine learning creditworthiness score. &
+We secure the pot with collateral instead of predicting who will default; the two could be combined. \\
+Batool et al. (2023), B-ROSCA \cite{batool2023} &
+Smart contract collateral on Ethereum and social network analysis to form groups of strangers. &
+B-ROSCA style flat collateral loses the credit benefit; ours is scaled to payout position (100\% of
+what is still owed after the payout), slashed automatically, with a fair draw and attack tests.
+Member matching is future work. \\
+WeTrust Trusted Lending Circles (2017) \cite{wetrust2017} &
+An early Ethereum ROSCA for groups of friends, with a bidding mechanism. &
+WeTrust assumed members trust each other and had no cover for a member who takes the pot and
+leaves; that is exactly the case our deposit rule covers. \\
+Mehmood et al. (2019) \cite{mehmood2019} &
+User studies of committees in Pakistan and a digital ROSCA prototype for low literacy users. &
+Informs our interface (plain language, reminders before deadlines, visible payment status). We ran
+no user study. \\
+Hackathon prototypes (Tanda, ROSA, Starosca) &
+Collateral based ROSCAs on various chains. &
+Not reviewed in depth; we focus on position scaled collateral, the threat model and gas. \\
+\bottomrule
+\end{tabularx}
+\end{table}

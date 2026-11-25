@@ -1,0 +1,36 @@
+\section{Limitations and Future Work}
+\label{sec:limits}
+
+\subsection{Limitations}
+\begin{itemize}
+  \item \textbf{Access.} Members need a wallet, a stablecoin and gas money, which many committee members
+        in Pakistan do not have. The prototype uses a mock stablecoin on a local chain; a real deployment
+        would need a fiat on ramp and a cheap layer 2 network.
+  \item \textbf{Legal status.} The legal position of crypto assets in Pakistan is uncertain; we make no
+        claim of compliance.
+  \item \textbf{Collateral is a barrier.} Scaling the deposit to payout position helps (the last slot locks
+        nothing after the draw), but every member first locks $(N-1)$ contributions when joining. This is
+        a deliberate trade off for 100\% cover.
+  \item \textbf{Sybil identities.} Reputation is per address; a defaulter can start again with a new one.
+        The deposit, not the score, is what protects the group.
+  \item \textbf{Randomness.} The draw resists the attacks we found, but a block proposer can still influence
+        the entropy slightly, and the seed falls back to \code{prevrandao} if the draw is finalized more
+        than 256 blocks after the last reveal.
+  \item \textbf{Token assumption.} Refunds are pushed in loops, which is safe only with a plain ERC20.
+  \item \textbf{Admin pause.} Bounded and harmless to funds, but still a small trust point.
+  \item \textbf{Off chain names.} Display names live only in the indexer database; losing it loses names
+        (never money), and members sign them again.
+  \item \textbf{No user study} and no external audit.
+\end{itemize}
+
+\subsection{Future work}
+\begin{itemize}
+  \item Chainlink VRF \cite{chainlinkvrf} for the payout draw.
+  \item Pull based deposit withdrawals, so no member can block refunds on any token.
+  \item The guarantor role (a third party who vouches for a member and lowers the deposit).
+  \item B-ROSCA style matching of strangers into groups \cite{batool2023}, possibly combined with a
+        creditworthiness score \cite{sharma2024}.
+  \item Email or Telegram reminders in addition to in app notifications.
+  \item Deployment to a public test network and then a low fee layer 2, with an independent audit.
+  \item A user study with committee members, following Mehmood et al. \cite{mehmood2019}.
+\end{itemize}

@@ -1,0 +1,142 @@
+% Trustless ROSCA: project report
+% Build (MiKTeX or TeX Live):  pdflatex main.tex  (run three times for the contents and page totals)
+% Layout follows the course template ROSCA_Blockchain.docx: A4, 1 inch margins, university banner
+% on the cover, course code and title, contents, Introduction ... Summary, Appendix, References.
+% Black and white throughout; light tints only inside diagrams.
+\documentclass[11pt,a4paper]{article}
+
+% ------------------------------------------------------------------ team (edit here) ---------
+\newcommand{\MemberA}{Sarita Sangrez}
+\newcommand{\RollA}{23i-2088}
+\newcommand{\MemberB}{Amna Ali}
+\newcommand{\RollB}{23i-XXXX}
+\newcommand{\MemberC}{Muhammad Talha}
+\newcommand{\RollC}{23i-XXXX}
+\newcommand{\ReportDate}{25th November 2026}
+\newcommand{\RepoURL}{https://github.com/saritasangrez20/ROSCA_Blockchain}
+
+% ------------------------------------------------------------------ fonts and page -----------
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{textcomp}
+\usepackage{lmodern}
+\usepackage[scaled=0.92]{helvet}
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage[a4paper,margin=2.54cm,headheight=14pt,headsep=12pt,footskip=28pt]{geometry}
+\usepackage{microtype}
+\usepackage{setspace}
+\setstretch{1.08}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+\setlength{\emergencystretch}{3em}
+
+% ------------------------------------------------------------------ graphics and tables ------
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,fit,calc,backgrounds,shapes.misc}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.17}
+\usepackage{booktabs,tabularx,array,multirow,makecell,longtable,xltabular}
+\usepackage{caption}
+\captionsetup{font=small,labelfont=bf,skip=6pt}
+\usepackage{float}
+\usepackage{enumitem}
+\setlist{itemsep=2pt,topsep=3pt,parsep=0pt}
+\usepackage{amsmath}
+\usepackage{listings}
+\usepackage{csquotes}
+\renewcommand{\arraystretch}{1.18}
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\newcolumntype{R}{>{\raggedleft\arraybackslash}p{1.6cm}}
+\newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+% light tints, used only inside diagrams
+\definecolor{onchain}{RGB}{232,240,250}
+\definecolor{offchain}{RGB}{252,244,226}
+\definecolor{people}{RGB}{238,238,238}
+\definecolor{boxline}{RGB}{90,90,90}
+
+% ------------------------------------------------------------------ headings (black) ---------
+\usepackage{titlesec}
+\titleformat{\section}{\Large\bfseries}{\thesection}{0.8em}{}[\vspace{2pt}\titlerule]
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{0.7em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{14pt}{8pt}
+\titlespacing*{\subsection}{0pt}{11pt}{5pt}
+\titlespacing*{\subsubsection}{0pt}{8pt}{3pt}
+
+\usepackage{tocloft}
+\renewcommand{\cftsecfont}{\bfseries}
+\renewcommand{\cftsecpagefont}{\bfseries}
+\renewcommand{\cftsecleader}{\cftdotfill{\cftdotsep}}
+\setlength{\cftbeforesecskip}{4pt}
+
+% ------------------------------------------------------------------ header and footer --------
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small Blockchain and Cryptocurrency (CS-4049)}
+\fancyhead[R]{\small Trustless ROSCA}
+\fancyfoot[C]{\small Page \thepage\ of \pageref*{LastPage}}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancypagestyle{plain}{\fancyhf{}\fancyfoot[C]{\small Page \thepage\ of \pageref*{LastPage}}\renewcommand{\headrulewidth}{0pt}}
+
+% ------------------------------------------------------------------ code listings ------------
+\lstdefinelanguage{Solidity}{
+  morekeywords={pragma,contract,abstract,is,function,returns,return,external,public,private,internal,
+    view,pure,memory,storage,calldata,struct,event,emit,modifier,immutable,constant,override,new,
+    require,if,else,for,while,mapping,address,bool,bytes32,uint256,uint88,uint64,uint40,uint32,
+    uint16,uint8,using,true,false},
+  sensitive=true,
+  morecomment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]"
+}
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\bfseries,
+  commentstyle=\itshape\color{black!65},
+  stringstyle=\color{black!80},
+  frame=single, rulecolor=\color{black!40}, framesep=4pt,
+  columns=fullflexible, keepspaces=true, breaklines=true,
+  showstringspaces=false, aboveskip=6pt, belowskip=4pt,
+  numbers=none
+}
+
+% ------------------------------------------------------------------ links (black) ------------
+\usepackage[hidelinks]{hyperref}
+\usepackage{bookmark}
+\hypersetup{pdftitle={Trustless ROSCA: Project Report},pdfauthor={\MemberA, \MemberB, \MemberC},pdfsubject={CS-4049 Blockchain and Cryptocurrency}}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\fix}[1]{\textbf{#1}}
+
+\begin{document}
+
+\input{sections/00_cover}
+
+\pagenumbering{roman}
+\tableofcontents
+\clearpage
+\listoffigures
+\listoftables
+\clearpage
+\pagenumbering{arabic}
+
+\input{sections/01_introduction}
+\input{sections/02_related_work}
+\input{sections/03_design}
+\input{sections/04_implementation}
+\input{sections/05_gas}
+\input{sections/06_security}
+\input{sections/07_testing}
+\input{sections/08_limitations}
+\input{sections/09_contribution}
+\input{sections/10_summary}
+\appendix
+\input{sections/11_appendix}
+\input{sections/12_references}
+
+\end{document}

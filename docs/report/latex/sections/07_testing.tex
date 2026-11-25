@@ -1,0 +1,82 @@
+\section{Testing and Deployment}
+\label{sec:testing}
+
+\subsection{Test suites}
+\code{npx hardhat test} runs 124 tests, all passing (Table~\ref{tab:tests}). Contract tests use
+Hardhat fixtures and time travel; the end to end tests run the real off chain code (IPFS store,
+indexer, notifier, keeper, HTTP API) against Hardhat's in process chain.
+
+\begin{table}[H]
+\centering\footnotesize
+\caption{Test suites (final run: 124 passing)}
+\label{tab:tests}
+\begin{tabularx}{\textwidth}{@{}P{5.8cm}P{1cm}rL@{}}
+\toprule
+Suite & Owner & Tests & What it proves \\
+\midrule
+\code{test/unit/Circle.test.js} & A & 35 & Workflows W1 to W8, boundaries, failures, default handling, pause \\
+\code{test/unit/Modules.test.js} & A & 17 & Vault, registry, draw, factory, token: roles and rules \\
+\code{test/e2e/circleEndToEnd.test.js} & B & 9 & A 4 member circle with one default through the whole off chain stack \\
+\code{test/e2e/indexerRebuild.test.js} & B & 6 & Rebuild from events gives identical tables; reorgs and redeploys \\
+\code{test/e2e/offchainUnits.test.js} & B & 11 & CIDs, API input checks, frontend error decoder \\
+\code{test/attacks/} (9 files) & C & 38 & Attack scenarios A1 to A9 (Table~\ref{tab:attacks}) \\
+\code{test/unit/AbiCompatibility.test.js} & C & 6 & No function, output or event used off chain changed \\
+\code{test/unit/FrontendErrors.test.js} & C & 2 & Every revert string has a plain words message \\
+\midrule
+Total & & 124 & \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Coverage}
+\begin{table}[H]
+\centering\small
+\caption{Line, statement, branch and function coverage of the production contracts (\code{npx hardhat coverage})}
+\label{tab:coverage}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Contract & Lines & Statements & Branches & Functions \\
+\midrule
+BaseCircleLifecycle & 95.1\% & 93.3\% & 84.4\% & 90.0\% \\
+Circle & 94.9\% & 94.6\% & 85.0\% & 87.9\% \\
+CircleFactory & 100\% & 100\% & 50.0\% & 100\% \\
+CollateralVault & 100\% & 100\% & 82.4\% & 100\% \\
+PayoutOrder & 98.5\% & 98.1\% & 75.9\% & 90.0\% \\
+ReputationRegistry & 100\% & 100\% & 70.0\% & 100\% \\
+MockStablecoin & 100\% & 100\% & 100\% & 100\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+The uncovered lines of \code{Circle} are the defensive leftover debt branch of \code{\_complete}, which
+Section~\ref{sec:invariant} shows is unreachable.
+
+\subsection{Interface guard}
+\label{sec:abi}
+The team rule allowed Member C to change contract internals, not function signatures or events. The ABIs
+exactly as Member B received them are kept in \code{test/fixtures/abi\_handoff/}, and a test checks
+that every function in them still exists with the same selector, outputs and mutability, and every
+event with the same signature and indexed fields. The only removal is \code{getHistory()} (G4), which no
+off chain code used. Additions: \code{CircleFactory.implementation()}, \code{Circle.totalPausedTime()},
+\code{Circle.PAUSE\_COOLDOWN()}. Member B's end to end tests, which load ABIs from the compiled
+artifacts, pass unchanged.
+
+\subsection{Live check of the whole stack}
+On a local Hardhat node with sample circles, the indexer and API, the keeper and the web app, we
+checked by hand that: the sample circles (all clones) show the right deposits, payments and history;
+pause, unpause and a second pause behave as in Figure~\ref{fig:pauseui}; after skipping 34 days one keeper
+pass settles the active circle, cancels the expired open circle and finalizes the draw that nobody
+revealed, leaving no tokens in that circle; the browser console shows no errors; and the frontend
+production build succeeds.
+
+\subsection{How to run}
+\begin{lstlisting}[language={}]
+npm install && npm run frontend:install   # once
+npx hardhat test                          # 124 tests
+npm run test:attacks                      # Member C's 38 attack tests
+npm run gas:measure && npm run gas:sheet  # gas of a full circle; rebuild the gas sheet
+npx hardhat node                          # terminal 1: local chain
+npm run seed:local                        # terminal 2: deploy and create sample circles
+npm run dev:services                      # indexer + API, keeper, web app (port 5173)
+\end{lstlisting}
+The system is deployed to the local Hardhat network for the demo; a Sepolia deployment was optional
+and was not needed to show any workflow.

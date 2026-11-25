@@ -1,0 +1,88 @@
+\section{Appendix}
+\label{sec:appendix}
+
+\subsection{Repository layout}
+\begin{lstlisting}[language={}]
+contracts/        core/ (BaseCircleLifecycle, Circle), risk/ (CircleFactory, CollateralVault,
+                  PayoutOrder), support/ (ReputationRegistry, MockStablecoin), interfaces/,
+                  test/ (test only attack helpers, never deployed)
+offchain/         ipfs/, indexer/, notifier/, api/, keeper/, lib/, cli/rebuild.js
+frontend/         React + Vite app (src/lib, src/components, src/state), tests/ (Playwright)
+test/             unit/ (A, plus C's interface guard), e2e/ (B), attacks/ (C), fixtures/
+scripts/          deploy, seedLocal, demo, measureGas, gasSheet, storageLayout (.js)
+docs/             workflows.md, handoff/ (handoff_1, handoff_2, final, bug reports),
+                  gas/ (baseline, steps, optimized, final, gas sheet, reporter tables, layout),
+                  security/ (threat model, mitigation map, attack results), test_results.md,
+                  report/ (this report: latex/ source and the PDF), screenshots/
+deployments/abi/  ABIs used by the running app (written by deploy.js)
+\end{lstlisting}
+
+\subsection{Stage 3 commits}
+\label{app:commits}
+All on branch \code{develop}, starting from \code{f07d545} (\code{handoff\_2} plus the B-1 fix).
+
+\begin{table}[H]
+\centering\small
+\caption{Stage 3 commit history}
+\label{tab:commits}
+\begin{tabularx}{\textwidth}{@{}P{1.6cm}L@{}}
+\toprule
+Commit & Change \\
+\midrule
+\code{2c63365} & Record the gas baseline before changing any contract \\
+\code{f508eb7} & G1: create circles as EIP 1167 clones of one implementation \\
+\code{14fc0b7} & G2: pack storage and make module addresses immutables \\
+\code{96b4b1e} & G3: record who paid a round in one bitmap \\
+\code{a62ff6c} & G4: keep reputation history in events only \\
+\code{13a8ea1} & Attack tests A1, A2, A4, A7 and their test only contracts \\
+\code{d6173bf} & S1: a pause can no longer force members into default (with A6) \\
+\code{ac4a868} & S2: the last revealer can no longer pick its payout slot (with A3) \\
+\code{8999331} & S3: deployer renounces the module admin role after setup (with A5) \\
+\code{a48278b} & Repack the lifecycle slot after S1 and keep round timing in one slot \\
+\code{5554ff2} & Interface guard test; plain words messages for the new reverts \\
+\code{391c14d} & A8: colluding defaulters as invariants over random patterns \\
+\code{9068ba2} & A9, threat model, mitigation map, gas sheet and final handoff note \\
+(last) & This report (LaTeX source and PDF) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Settlement of a round (excerpt)}
+The core of \code{Circle.settleRound} after the optimizations: one read of the paid bitmap, a loop over
+unpaid members only, then debt repayment and deposit refill for the recipient.
+
+\begin{lstlisting}[language=Solidity]
+uint256 bits = _paidBits[r];
+uint256 everyone = (1 << n) - 1;
+require(bits == everyone || block.timestamp > roundDeadline(), "Circle: round still open");
+address recipient = order[r - 1];
+uint256 pot = 0;
+if (bits == everyone) {
+    pot = n * c;
+} else {
+    for (uint256 i = 0; i < n; i++) {
+        if ((bits >> i) & 1 == 1) { pot += c; continue; }
+        address m = order[i];
+        _member[m].defaults += 1;
+        reputation.recordDefault(m);
+        if (m == recipient) { emit MemberDefaulted(r, m, 0, 0); continue; }
+        uint256 covered = vault.slash(m, c);       // 100% for members already paid out
+        uint256 uncovered = c - covered;
+        pot += covered;
+        if (uncovered > 0) { shortfall += uncovered; debtOf[m] += uncovered; deficitOf[recipient] += uncovered; }
+        emit MemberDefaulted(r, m, covered, uncovered);
+    }
+}
+// 1. repay the recipient's own debt first  2. refill its deposit to 100%  3. credit the rest
+\end{lstlisting}
+
+\subsection{Gas measurement scenario}
+\begin{itemize}
+  \item Deploy all contracts with \code{scripts/deploy.js}; 4 members with 100,000 mUSD each.
+  \item Organizer creates a circle: 1,000 mUSD, 4 members, 30 day rounds, 1 day grace, 7 day join window,
+        1 day draw phases, no past defaults allowed.
+  \item Members join in a fixed order, commit and reveal; anyone finalizes.
+  \item Round 1: slots 1 to 4 pay in that order; settle; slot 1 claims.
+  \item Rounds 2 to 4: slot 1 does not pay; slots 2 to 4 pay; time moves 32 days; settle; the recipient claims.
+  \item Recorded: every named call, the sum over every transaction, deployment gas and bytecode sizes.
+\end{itemize}
