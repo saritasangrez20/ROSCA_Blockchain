@@ -1,6 +1,27 @@
 [
   {
-    "inputs": [],
+    "inputs": [
+      {
+        "internalType": "contract IERC20",
+        "name": "token_",
+        "type": "address"
+      },
+      {
+        "internalType": "contract ICollateralVault",
+        "name": "vault_",
+        "type": "address"
+      },
+      {
+        "internalType": "contract IPayoutOrder",
+        "name": "payoutOrder_",
+        "type": "address"
+      },
+      {
+        "internalType": "contract IReputationRegistry",
+        "name": "reputation_",
+        "type": "address"
+      }
+    ],
     "stateMutability": "nonpayable",
     "type": "constructor"
   },
@@ -553,6 +574,19 @@
   },
   {
     "inputs": [],
+    "name": "PAUSE_COOLDOWN",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "cancel",
     "outputs": [],
     "stateMutability": "nonpayable",
@@ -669,7 +703,7 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "",
+        "name": "account",
         "type": "address"
       }
     ],
@@ -936,12 +970,12 @@
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "",
+        "name": "round",
         "type": "uint256"
       },
       {
         "internalType": "address",
-        "name": "",
+        "name": "account",
         "type": "address"
       }
     ],
@@ -1154,7 +1188,7 @@
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "",
+        "name": "round",
         "type": "uint256"
       }
     ],
@@ -1162,7 +1196,7 @@
     "outputs": [
       {
         "internalType": "uint256",
-        "name": "",
+        "name": "count",
         "type": "uint256"
       }
     ],
@@ -1232,7 +1266,7 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "",
+        "name": "account",
         "type": "address"
       }
     ],
@@ -1251,7 +1285,7 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "",
+        "name": "account",
         "type": "address"
       }
     ],
@@ -1345,7 +1379,7 @@
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "",
+        "name": "round",
         "type": "uint256"
       }
     ],
@@ -1422,6 +1456,19 @@
         "internalType": "contract IERC20",
         "name": "",
         "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "totalPausedTime",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "total",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",

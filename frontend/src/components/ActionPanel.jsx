@@ -284,7 +284,7 @@ export default function ActionPanel({ c, history }) {
   if (w.isPauser && c.state <= 2) {
     blocks.push(
       <Block key="admin" title="Platform admin">
-        <p className="muted">Pausing stops joining and paying for at most 7 days. Settling, refunds and claims keep working, so a pause cannot trap money.</p>
+        <p className="muted">Pausing stops joining and paying for at most 7 days. The time spent paused is added to the payment deadline, so nobody misses a payment because of it. Settling, refunds and claims keep working, so a pause cannot trap money. After a pause ends, the next one is possible only 7 days later.</p>
         {c.paused ? (
           <button className="btn" onClick={() => run("Unpause circle", [{ label: "Unpause", send: () => circleW().unpause() }])}>Unpause</button>
         ) : (
