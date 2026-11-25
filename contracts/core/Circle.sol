@@ -26,6 +26,8 @@ import {ICollateralVault, IPayoutOrder, IReputationRegistry} from "../interfaces
 ///        round result takes one slot. The four shared module addresses are immutables of the
 ///        implementation (identical for every clone of one factory), so they cost no storage.
 ///        The public getters of the baseline are kept as view functions with the same outputs.
+///      * Security fix S1 (attack test A6): the payment deadline of a round is pushed back by
+///        the time the circle spent paused during that round (see BaseCircleLifecycle).
 ///      * G3 paid bitmap: who paid in a round is one uint256 per round (bit i = payout position
 ///        i + 1) instead of a nested mapping of bools plus a separate counter. Paying writes one
 ///        slot instead of two, and settling reads one slot instead of one per member.
@@ -121,6 +123,7 @@ contract Circle is BaseCircleLifecycle {
     uint40 private _joinDeadline;
     uint40 private _roundStart;
     uint8 private _currentRound; // 0 before Active, then 1..order.length
+    uint40 private _roundPauseMark; // totalPausedTime() when the current round started
     string private _termsCid; // IPFS CID of the human readable terms document
 
     // ----- membership and order -----
@@ -344,9 +347,10 @@ contract Circle is BaseCircleLifecycle {
         emit ContributionMade(r, msg.sender, c);
     }
 
-    /// @notice Last moment a payment for the current round is accepted.
+    /// @notice Last moment a payment for the current round is accepted. Time spent paused
+    ///         during the round is added, because nobody can pay while the circle is paused.
     function roundDeadline() public view returns (uint256) {
-        return uint256(_roundStart) + _roundDuration + _gracePeriod;
+        return uint256(_roundStart) + _roundDuration + _gracePeriod + (totalPausedTime() - _roundPauseMark);
     }
 
     // =====================================================================
@@ -588,6 +592,7 @@ contract Circle is BaseCircleLifecycle {
     function _startRound(uint256 r) private {
         _currentRound = uint8(r);
         _roundStart = uint40(block.timestamp);
+        _roundPauseMark = uint40(totalPausedTime());
         emit RoundStarted(r, order[r - 1], roundDeadline());
     }
 
