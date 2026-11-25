@@ -7,9 +7,10 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 /// @notice Fair "who gets paid when" draw using commit then reveal.
 /// @dev 1. Each member commits keccak256(secret, member, circle) without showing the secret.
 ///      2. Once everyone committed (or the commit window ends) members reveal their secrets.
-///      3. The random seed mixes every revealed secret plus the block randomness at the
-///         moment the draw is finalized, so nobody (not the organizer, and not the last
-///         member to reveal) can compute the final order before choosing to reveal.
+///      3. The random seed mixes every revealed secret with the hash of the block that holds
+///         the last reveal. Nobody (not the organizer, and not the last member to reveal)
+///         knows that hash when they choose to reveal, and once it exists the order is fixed,
+///         whoever finalizes and whenever.
 ///      4. Members who never reveal are left out of the order. The circle removes them
 ///         and charges a penalty, so walking away from the draw costs money and cannot
 ///         cancel the circle for everyone else.
@@ -17,6 +18,13 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 ///      Gas optimization G2 (Member C): the draw's flags, deadlines and counters share one
 ///      storage slot, and each member's "participant" and "revealed" flags share one slot.
 ///      The public getters of the baseline are kept as view functions with the same outputs.
+///
+///      Security fix S2 (Member C, attack test A3). The baseline mixed in block.prevrandao at
+///      finalize time, and anyone may finalize. A member contract could therefore reveal last
+///      and finalize in the same transaction, then revert both unless it liked its slot, and
+///      retry every block; or, after revealing, finalize and revert until the order suited it.
+///      Now finalize must run in a later block than the last reveal, and the entropy is the
+///      hash of the last reveal's block, which is the same for every finalize call.
 contract PayoutOrder is AccessControl {
     bytes32 public constant REGISTRAR_ROLE = keccak256("REGISTRAR_ROLE");
     bytes32 public constant CIRCLE_ROLE = keccak256("CIRCLE_ROLE");
@@ -32,6 +40,7 @@ contract PayoutOrder is AccessControl {
         uint40 revealDeadline;
         uint16 commitCount;
         uint16 revealCount;
+        uint64 lastRevealBlock;
         // -----
         bytes32 seed;
         address[] members;
@@ -116,6 +125,7 @@ contract PayoutOrder is AccessControl {
         );
         flags[circle][msg.sender] = f | REVEALED;
         d.revealCount += 1;
+        d.lastRevealBlock = uint64(block.number);
         d.seed = keccak256(abi.encodePacked(d.seed, secret));
         emit Revealed(circle, msg.sender);
     }
@@ -130,6 +140,10 @@ contract PayoutOrder is AccessControl {
         uint256 total = d.members.length;
         uint256 n = d.revealCount;
         require(n == total || block.timestamp > d.revealDeadline, "Order: reveal window still open");
+        uint256 lastReveal = d.lastRevealBlock;
+        // No reveal and finalize in one transaction (or one block): the outcome must not be
+        // computable by the member who sends the last reveal.
+        require(block.number > lastReveal, "Order: finalize in a later block");
         d.finalized = true;
 
         order = new address[](n);
@@ -141,8 +155,13 @@ contract PayoutOrder is AccessControl {
                 k++;
             }
         }
-        // Fresh randomness at finalize time: unknown to anyone when they decided to reveal.
-        bytes32 seed = keccak256(abi.encodePacked(d.seed, block.prevrandao, msg.sender));
+        // Entropy fixed by the block that holds the last reveal: unknown when that reveal was
+        // sent, identical for every later finalize call, so retrying finalize gains nothing.
+        // Falls back to block.prevrandao if nobody revealed or that block is more than 256
+        // blocks old (blockhash returns 0); see the threat model for this residual risk.
+        bytes32 entropy = lastReveal == 0 ? bytes32(0) : blockhash(lastReveal);
+        if (entropy == bytes32(0)) entropy = bytes32(block.prevrandao);
+        bytes32 seed = keccak256(abi.encodePacked(d.seed, entropy, msg.sender));
         // Fisher Yates shuffle driven by the combined seed.
         if (n > 1) {
             for (uint256 i = n - 1; i > 0; i--) {
