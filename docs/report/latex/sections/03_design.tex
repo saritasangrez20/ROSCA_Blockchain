@@ -47,15 +47,15 @@ state changing function has an \code{inState} guard and \code{\_transition} reje
   st/.style={draw=boxline, rounded corners=3pt, align=center, minimum width=3.0cm, minimum height=1.15cm, font=\small, fill=white},
   ar/.style={-{Stealth[length=2.2mm]}, thick, draw=black!75},
   lb/.style={font=\scriptsize, align=center}]
-\node[st] (open) at (0,0) {\textbf{Open}\\members join and\\lock a deposit};
-\node[st] (draw) at (4.7,0) {\textbf{Order draw}\\commit, reveal;\\excess refunded};
+\node[st, fill=tintblue] (open) at (0,0) {\textbf{Open}\\members join and\\lock a deposit};
+\node[st, fill=tintblue] (draw) at (4.7,0) {\textbf{Order draw}\\commit, reveal;\\excess refunded};
 \node[st] (contrib) at (10.0,0.2) {\textbf{Contributing}\\pay before deadline\\plus grace};
 \node[st] (settle) at (10.0,-1.7) {\textbf{Settle round}\\unpaid members\\slashed and logged};
 \node[st] (payout) at (10.0,-3.6) {\textbf{Payout claimable}\\recipient pulls\\the pot};
-\node[st, line width=1.1pt] (done) at (10.0,-5.9) {\textbf{Completed}\\deposits released,\\reputation updated};
-\node[st] (cancel) at (0,-3.6) {\textbf{Cancelled}\\everyone refunded\\in full};
+\node[st, fill=tintgreen, line width=1.1pt] (done) at (10.0,-5.9) {\textbf{Completed}\\deposits released,\\reputation updated};
+\node[st, fill=tintrose] (cancel) at (0,-3.6) {\textbf{Cancelled}\\everyone refunded\\in full};
 \begin{scope}[on background layer]
-  \node[draw=boxline, dashed, rounded corners=5pt, fill=people, inner sep=7pt, fit=(contrib)(settle)(payout), label={[font=\small\bfseries]above:Active: rounds 1 to N}] (rounds) {};
+  \node[draw=boxline, dashed, rounded corners=5pt, fill=tintgreen!70, inner sep=7pt, fit=(contrib)(settle)(payout), label={[font=\small\bfseries]above:Active: rounds 1 to N}] (rounds) {};
 \end{scope}
 \draw[ar] (open) -- node[lb, above]{last member\\joins} (draw);
 \draw[ar] (draw) -- node[lb, above]{2 or more\\revealed} (contrib.west |- draw);
@@ -148,7 +148,7 @@ moving transaction and only read from the chain (the keeper only calls functions
 \draw[ar] (circ.south) ++(0.3,0) -- (order.north);
 \draw[ar] (circ.south) ++(1.2,0) -- (rep.north);
 \end{tikzpicture}
-\caption{Architecture: seven contracts, four off chain services, one browser app (tints only mark the two zones)}
+\caption{Architecture: seven contracts, four off chain services, one browser app (blue: on chain, amber: off chain)}
 \label{fig:architecture}
 \end{figure}
 
@@ -163,7 +163,7 @@ holding \code{CIRCLE\_ROLE} (Figure~\ref{fig:contracts}).
 \centering
 \begin{tikzpicture}[
   cl/.style={draw=boxline, align=center, font=\small, minimum height=0.85cm, minimum width=2.75cm, fill=white, inner sep=3pt},
-  oz/.style={cl, fill=people, font=\footnotesize},
+  oz/.style={cl, fill=ozgray, font=\footnotesize},
   inh/.style={-{Triangle[open,length=2.6mm,width=2.4mm]}, thick},
   use/.style={-{Stealth[length=2mm]}, draw=black!70},
   lb/.style={font=\scriptsize, align=center, fill=white, inner sep=1pt}]
@@ -171,13 +171,13 @@ holding \code{CIRCLE\_ROLE} (Figure~\ref{fig:contracts}).
 \node[oz] (ac) at (-1.6,4.2) {AccessControl};
 \node[oz] (pa) at (1.6,4.2) {Pausable};
 \node[oz] (rg) at (4.8,4.2) {ReentrancyGuard};
-\node[cl, minimum width=12.6cm] (base) at (0,2.6) {\textit{BaseCircleLifecycle} (abstract): state machine, roles, bounded pause, reentrancy guard, initializer};
-\node[cl, minimum width=4.6cm, line width=1pt] (circle) at (0.6,1.0) {\textbf{Circle}\\[-1pt]{\scriptsize join, contribute, settle, claim, cancel}};
-\node[cl] (fac) at (-4.9,1.0) {\textbf{CircleFactory}\\[-1pt]{\scriptsize EIP 1167 clones}};
-\node[cl] (vault) at (-4.4,-1.2) {\textbf{CollateralVault}\\[-1pt]{\scriptsize deposit, release, slash}};
-\node[cl] (order) at (-1.0,-1.2) {\textbf{PayoutOrder}\\[-1pt]{\scriptsize commit, reveal, finalize}};
-\node[cl] (rep) at (2.4,-1.2) {\textbf{ReputationRegistry}\\[-1pt]{\scriptsize joins, completions, defaults}};
-\node[cl] (tok) at (5.6,-1.2) {\textbf{MockStablecoin}\\[-1pt]{\scriptsize ERC20, 6 decimals}};
+\node[cl, minimum width=12.6cm, fill=tintviolet] (base) at (0,2.6) {\textit{BaseCircleLifecycle} (abstract): state machine, roles, bounded pause, reentrancy guard, initializer};
+\node[cl, minimum width=4.6cm, line width=1pt, fill=tintblue] (circle) at (0.6,1.0) {\textbf{Circle}\\[-1pt]{\scriptsize join, contribute, settle, claim, cancel}};
+\node[cl, fill=tintamber] (fac) at (-4.9,1.0) {\textbf{CircleFactory}\\[-1pt]{\scriptsize EIP 1167 clones}};
+\node[cl, fill=tintteal] (vault) at (-4.4,-1.2) {\textbf{CollateralVault}\\[-1pt]{\scriptsize deposit, release, slash}};
+\node[cl, fill=tintteal] (order) at (-1.0,-1.2) {\textbf{PayoutOrder}\\[-1pt]{\scriptsize commit, reveal, finalize}};
+\node[cl, fill=tintteal] (rep) at (2.4,-1.2) {\textbf{ReputationRegistry}\\[-1pt]{\scriptsize joins, completions, defaults}};
+\node[cl, fill=tintgreen] (tok) at (5.6,-1.2) {\textbf{MockStablecoin}\\[-1pt]{\scriptsize ERC20, 6 decimals}};
 \foreach \x in {ini,ac,pa,rg} \draw[inh] (\x.south) -- (\x.south |- base.north);
 \draw[inh] (circle.north) -- (circle.north |- base.south);
 \draw[use] (fac) -- node[lb, above, yshift=2pt]{clones} (circle);

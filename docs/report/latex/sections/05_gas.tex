@@ -75,8 +75,9 @@ W5+W7 last settle (completes) & 539,886 & 542,549 & 434,234 & 424,567 & 225,095 
   every node near coord/.append style={/pgf/number format/.cd, fixed, precision=2},
   axis lines*=left, ymajorgrids, grid style={black!12},
   enlarge x limits=0.1]
-\addplot[fill=black!35, draw=black!80] coordinates {
-  (1,9.62) (2,6.37) (3,5.40) (4,5.11) (5,4.54) (6,4.52)};
+\addplot[fill=barbase, draw=black!60, bar shift=0pt] coordinates {(1,9.62)};
+\addplot[fill=barstep, draw=black!60, bar shift=0pt] coordinates {(2,6.37) (3,5.40) (4,5.11) (5,4.54)};
+\addplot[fill=barfinal, draw=black!60, bar shift=0pt] coordinates {(6,4.52)};
 \end{axis}
 \end{tikzpicture}
 \caption{Gas for a whole 4 member circle with one default (every transaction), after each step}
@@ -99,7 +100,7 @@ W5+W7 last settle (completes) & 539,886 & 542,549 & 434,234 & 424,567 & 225,095 
   every node near coord/.append style={/pgf/number format/.cd, fixed, precision=1},
   axis lines*=left, xmajorgrids, grid style={black!12},
   enlarge y limits=0.05]
-\addplot[fill=black!25, draw=black!80] coordinates {
+\addplot[fill=barstep, draw=black!60] coordinates {
   (-1.1,1) (12.4,2) (18.8,3) (21.1,4) (24.8,5) (27.7,6) (28.7,7) (30.5,8) (35.2,9) (40.0,10) (40.5,11) (48.5,12) (58.6,13) (87.8,14)};
 \end{axis}
 \end{tikzpicture}

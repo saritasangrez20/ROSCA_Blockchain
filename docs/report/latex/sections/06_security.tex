@@ -149,10 +149,10 @@ during it, so a pause cannot help defaulters either.
 \foreach \x/\t in {0.4/round starts, 6.6/pause, 8.0/old deadline, 10.6/unpause, 12.0/new deadline} {
   \draw (\x,0.15) -- (\x,-0.15) node[below, lb]{\t};
 }
-\fill[black!15] (6.6,0.22) rectangle (10.6,0.88);
+\filldraw[fill=tintamber, draw=orange!45] (6.6,0.22) rectangle (10.6,0.88);
 \node[lb] at (9.33,0.55) {paused: nobody\\can pay (4 days)};
 \draw[|<->|] (6.6,-0.95) -- node[below, lb]{1 hour left when paused} (8.0,-0.95);
-\draw[|<->|] (10.6,-0.95) -- node[below, lb]{still 1 hour left} (12.0,-0.95);
+\draw[|<->|, draw=green!45!black] (10.6,-0.95) -- node[below, lb]{still 1 hour left} (12.0,-0.95);
 \draw[densely dashed] (8.0,0) -- (8.0,1.15) node[above, lb]{before S1: anyone could settle here\\and every member was slashed};
 \end{tikzpicture}
 \caption{S1: the time spent paused is added to the payment deadline}
@@ -195,10 +195,10 @@ back, finalizes 26 blocks and a day later from another account, and gets the ide
 \begin{tikzpicture}[blk/.style={draw=boxline, minimum width=1.9cm, minimum height=0.8cm, font=\scriptsize, align=center},
   lb/.style={font=\scriptsize, align=center}]
 \node[blk] (b1) at (0,0) {block $N-1$\\reveals};
-\node[blk, line width=1pt] (b2) at (2.4,0) {block $N$\\last reveal};
+\node[blk, line width=1pt, fill=tintblue] (b2) at (2.4,0) {block $N$\\last reveal};
 \node[blk] (b3) at (4.8,0) {block $N+1$};
 \node[blk] (b4) at (7.2,0) {\dots};
-\node[blk] (b5) at (9.6,0) {block $N+k$\\finalize};
+\node[blk, fill=tintgreen] (b5) at (9.6,0) {block $N+k$\\finalize};
 \draw[-{Stealth}] (b1) -- (b2); \draw[-{Stealth}] (b2) -- (b3); \draw[-{Stealth}] (b3) -- (b4); \draw[-{Stealth}] (b4) -- (b5);
 \node[lb, below=0.35cm of b2] (h) {$H_N$ = hash of block $N$\\unknown when the reveal is sent};
 \node[lb, below=0.35cm of b5] (s) {seed = keccak(secrets, $H_N$, circle)\\same for every $k \geq 1$};
