@@ -1,0 +1,57 @@
+
+Circle
+┌─────────┬──────┬────────┬───────┬──────────────────────┬─────────────────────────────────────────────────────┐
+│ (index) │ slot │ offset │ bytes │ variable             │ type                                                │
+├─────────┼──────┼────────┼───────┼──────────────────────┼─────────────────────────────────────────────────────┤
+│ 0       │ 0    │ 0      │ 32    │ '_roles'             │ 'mapping(bytes32 => struct AccessControl.RoleData)' │
+│ 1       │ 1    │ 0      │ 1     │ '_paused'            │ 'bool'                                              │
+│ 2       │ 2    │ 0      │ 32    │ '_status'            │ 'uint256'                                           │
+│ 3       │ 3    │ 0      │ 1     │ 'state'              │ 'enum BaseCircleLifecycle.State'                    │
+│ 4       │ 3    │ 1      │ 5     │ '_pauseExpiresAt'    │ 'uint40'                                            │
+│ 5       │ 3    │ 6      │ 5     │ '_pausedAt'          │ 'uint40'                                            │
+│ 6       │ 3    │ 11     │ 5     │ '_pausedTotal'       │ 'uint40'                                            │
+│ 7       │ 3    │ 16     │ 5     │ '_lastPauseEnd'      │ 'uint40'                                            │
+│ 8       │ 3    │ 21     │ 8     │ '_contribution'      │ 'uint64'                                            │
+│ 9       │ 3    │ 29     │ 1     │ '_groupSize'         │ 'uint8'                                             │
+│ 10      │ 3    │ 30     │ 2     │ '_maxDefaults'       │ 'uint16'                                            │
+│ 11      │ 4    │ 0      │ 20    │ 'organizer'          │ 'address'                                           │
+│ 12      │ 4    │ 20     │ 4     │ '_joinDuration'      │ 'uint32'                                            │
+│ 13      │ 4    │ 24     │ 4     │ '_drawPhaseDuration' │ 'uint32'                                            │
+│ 14      │ 5    │ 0      │ 5     │ '_joinDeadline'      │ 'uint40'                                            │
+│ 15      │ 5    │ 5      │ 4     │ '_roundDuration'     │ 'uint32'                                            │
+│ 16      │ 5    │ 9      │ 4     │ '_gracePeriod'       │ 'uint32'                                            │
+│ 17      │ 5    │ 13     │ 5     │ '_roundStart'        │ 'uint40'                                            │
+│ 18      │ 5    │ 18     │ 1     │ '_currentRound'      │ 'uint8'                                             │
+│ 19      │ 5    │ 19     │ 5     │ '_roundPauseMark'    │ 'uint40'                                            │
+│ 20      │ 6    │ 0      │ 32    │ '_termsCid'          │ 'string'                                            │
+│ 21      │ 7    │ 0      │ 32    │ 'members'            │ 'address[]'                                         │
+│ 22      │ 8    │ 0      │ 32    │ 'order'              │ 'address[]'                                         │
+│ 23      │ 9    │ 0      │ 32    │ '_member'            │ 'mapping(address => struct Circle.MemberData)'      │
+│ 24      │ 10   │ 0      │ 32    │ '_paidBits'          │ 'mapping(uint256 => uint256)'                       │
+│ 25      │ 11   │ 0      │ 32    │ '_rounds'            │ 'mapping(uint256 => struct Circle.RoundRecord)'     │
+│ 26      │ 12   │ 0      │ 32    │ '_shortfall'         │ 'mapping(uint256 => uint256)'                       │
+│ 27      │ 13   │ 0      │ 32    │ 'withdrawable'       │ 'mapping(address => uint256)'                       │
+│ 28      │ 14   │ 0      │ 32    │ 'debtOf'             │ 'mapping(address => uint256)'                       │
+│ 29      │ 15   │ 0      │ 32    │ 'deficitOf'          │ 'mapping(address => uint256)'                       │
+└─────────┴──────┴────────┴───────┴──────────────────────┴─────────────────────────────────────────────────────┘
+slots used by fixed size variables: 16
+
+PayoutOrder
+┌─────────┬──────┬────────┬───────┬────────────────┬─────────────────────────────────────────────────────┐
+│ (index) │ slot │ offset │ bytes │ variable       │ type                                                │
+├─────────┼──────┼────────┼───────┼────────────────┼─────────────────────────────────────────────────────┤
+│ 0       │ 0    │ 0      │ 32    │ '_roles'       │ 'mapping(bytes32 => struct AccessControl.RoleData)' │
+│ 1       │ 1    │ 0      │ 32    │ 'draws'        │ 'mapping(address => struct PayoutOrder.Draw)'       │
+│ 2       │ 2    │ 0      │ 32    │ 'flags'        │ 'mapping(address => mapping(address => uint8))'     │
+│ 3       │ 3    │ 0      │ 32    │ 'commitmentOf' │ 'mapping(address => mapping(address => bytes32))'   │
+└─────────┴──────┴────────┴───────┴────────────────┴─────────────────────────────────────────────────────┘
+slots used by fixed size variables: 4
+
+ReputationRegistry
+┌─────────┬──────┬────────┬───────┬───────────┬──────────────────────────────────────────────────────────────┐
+│ (index) │ slot │ offset │ bytes │ variable  │ type                                                         │
+├─────────┼──────┼────────┼───────┼───────────┼──────────────────────────────────────────────────────────────┤
+│ 0       │ 0    │ 0      │ 32    │ '_roles'  │ 'mapping(bytes32 => struct AccessControl.RoleData)'          │
+│ 1       │ 1    │ 0      │ 32    │ 'records' │ 'mapping(address => struct ReputationRegistry.PackedRecord)' │
+└─────────┴──────┴────────┴───────┴───────────┴──────────────────────────────────────────────────────────────┘
+slots used by fixed size variables: 2

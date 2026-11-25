@@ -12,6 +12,9 @@ module.exports = {
       // Baseline build: optimizer settings are fixed so gas numbers stay comparable
       // between the baseline tag and the optimized tag.
       optimizer: { enabled: true, runs: 200 },
+      // Stage 3: also emit storage layouts (does not change bytecode) so the packed layout can
+      // be checked, see scripts/storageLayout.js.
+      outputSelection: { "*": { "*": ["storageLayout"] } },
     },
   },
   networks: {

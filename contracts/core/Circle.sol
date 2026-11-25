@@ -21,8 +21,8 @@ import {ICollateralVault, IPayoutOrder, IReputationRegistry} from "../interfaces
 ///
 ///      Gas optimizations (Member C, Stage 3). External functions, events and view outputs are
 ///      unchanged, so the indexer, keeper and frontend keep working:
-///      * G2 storage packing: the configuration, round timing and round counter fit in two
-///        slots; each member's position, removal flag and default count share one slot; a
+///      * G2 storage packing: the configuration, round timing and round counter fit in three
+///        slots (one of them shared with the lifecycle state); each member's position, removal flag and default count share one slot; a
 ///        round result takes one slot. The four shared module addresses are immutables of the
 ///        implementation (identical for every clone of one factory), so they cost no storage.
 ///        The public getters of the baseline are kept as view functions with the same outputs.
@@ -110,17 +110,23 @@ contract Circle is BaseCircleLifecycle {
     IPayoutOrder public immutable payoutOrder;
     IReputationRegistry public immutable reputation;
 
-    // ----- configuration, slot 1: organizer | contribution | groupSize | maxDefaults -----
-    address public organizer;
+    // ----- these three fill the last 88 bits of BaseCircleLifecycle's slot (state + pause
+    //       bookkeeping, 168 bits): the slot is non zero from initialize on, so state changes
+    //       never pay for a zero to non zero write, and every call that checks the state reads
+    //       the contribution for free -----
     uint64 private _contribution;
     uint8 private _groupSize;
     uint16 private _maxDefaults;
-    // ----- configuration and timing, slot 2 -----
-    uint32 private _roundDuration;
-    uint32 private _gracePeriod;
+    // ----- one slot (28 bytes): organizer and the two durations only needed before the rounds -----
+    address public organizer;
     uint32 private _joinDuration;
     uint32 private _drawPhaseDuration;
+    // ----- one slot (24 bytes): everything roundDeadline(), contribute and settleRound need.
+    //       _joinDeadline comes first on purpose: it does not fit in the 4 bytes left above, so
+    //       it starts this slot and the round fields after it stay together -----
     uint40 private _joinDeadline;
+    uint32 private _roundDuration;
+    uint32 private _gracePeriod;
     uint40 private _roundStart;
     uint8 private _currentRound; // 0 before Active, then 1..order.length
     uint40 private _roundPauseMark; // totalPausedTime() when the current round started
