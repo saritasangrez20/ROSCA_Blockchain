@@ -211,6 +211,10 @@ contract Circle is BaseCircleLifecycle {
     ///      remaining members; it is only cancelled if fewer than two revealed.
     function finalizeDraw() external inState(State.OrderDraw) nonReentrant {
         address[] memory drawn = payoutOrder.finalize();
+        // B-1: the penalty for not revealing is shared among the members who revealed.
+        // If nobody revealed there is nobody to share it with, so no penalty is taken:
+        // otherwise the slashed tokens would stay in this cancelled circle forever.
+        bool anyoneRevealed = drawn.length > 0;
 
         uint256 penaltyPool = 0;
         for (uint256 i = 0; i < members.length; i++) {
@@ -220,7 +224,7 @@ contract Circle is BaseCircleLifecycle {
             _revokeRole(MEMBER_ROLE, m);
             defaultsInCircle[m] += 1;
             reputation.recordDefault(m);
-            uint256 penalty = vault.slash(m, config.contribution);
+            uint256 penalty = anyoneRevealed ? vault.slash(m, config.contribution) : 0;
             penaltyPool += penalty;
             vault.release(m, type(uint256).max);
             emit MemberRemoved(m, penalty);

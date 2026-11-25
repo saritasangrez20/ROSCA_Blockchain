@@ -207,6 +207,25 @@ describe("Circle: payout order draw (W3)", function () {
     expect(await circle.withdrawable(alice.address)).to.equal(3n * C);
     await circle.connect(alice).claimPayout();
   });
+
+  it("B-1: when nobody reveals, no penalty is taken and no tokens are left in the circle", async function () {
+    const { circle, token, vault, payoutOrder, members } = await loadFixture(drawFixture);
+    const addr = await circle.getAddress();
+    const before = {};
+    for (const m of members) before[m.address] = await token.balanceOf(m.address);
+    const locked = {};
+    for (const m of members) locked[m.address] = await vault.collateralOf(addr, m.address);
+    await runDraw(circle, payoutOrder, members, { finalize: false, skipReveal: members });
+    await time.increase(2 * DAY + 1);
+    await expect(circle.finalizeDraw()).to.emit(circle, "CircleCancelled");
+    expect(await circle.state()).to.equal(State.Cancelled);
+    expect(await vault.totalLocked(addr)).to.equal(0n);
+    expect(await token.balanceOf(addr)).to.equal(0n); // nothing stuck in the circle
+    for (const m of members) {
+      expect(await token.balanceOf(m.address)).to.equal(before[m.address] + locked[m.address]); // full deposit back
+      expect(await circle.withdrawable(m.address)).to.equal(0n);
+    }
+  });
 });
 
 describe("Circle: full happy path (W4, W5, W6, W7)", function () {
