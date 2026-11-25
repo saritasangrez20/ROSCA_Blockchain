@@ -55,13 +55,14 @@ state changing function has an \code{inState} guard and \code{\_transition} reje
 \node[st, fill=tintgreen, line width=1.1pt] (done) at (10.0,-5.9) {\textbf{Completed}\\deposits released,\\reputation updated};
 \node[st, fill=tintrose] (cancel) at (0,-3.6) {\textbf{Cancelled}\\everyone refunded\\in full};
 \begin{scope}[on background layer]
-  \node[draw=boxline, dashed, rounded corners=5pt, fill=tintgreen!70, inner sep=7pt, fit=(contrib)(settle)(payout), label={[font=\small\bfseries]above:Active: rounds 1 to N}] (rounds) {};
+  \coordinate (loopR) at ($(payout.east)+(1.75,0)$);
+  \node[draw=boxline, dashed, rounded corners=5pt, fill=tintgreen!70, inner sep=7pt, fit=(contrib)(settle)(payout)(loopR), label={[font=\small\bfseries]above:Active: rounds 1 to N}] (rounds) {};
 \end{scope}
 \draw[ar] (open) -- node[lb, above]{last member\\joins} (draw);
 \draw[ar] (draw) -- node[lb, above]{2 or more\\revealed} (contrib.west |- draw);
 \draw[ar] (contrib) -- (settle);
 \draw[ar] (settle) -- (payout);
-\draw[ar] (payout.east) -- ++(0.75,0) |- node[lb, right, pos=0.25]{next\\round} (contrib.east);
+\draw[ar] (payout.east) -- ++(0.7,0) |- node[lb, right, pos=0.25]{next\\round} (contrib.east);
 \draw[ar] (payout) -- node[lb, right]{after round N} (done);
 \draw[ar] (open) -- node[lb, left]{organizer, or\\join deadline\\passed unfilled} (cancel);
 \draw[ar] (draw.south) |- node[lb, above, pos=0.75]{fewer than 2 revealed} (cancel.east);
@@ -108,47 +109,53 @@ moving transaction and only read from the chain (the keeper only calls functions
   oc/.style={box, fill=onchain, minimum width=2.3cm, font=\footnotesize},
   of/.style={box, fill=offchain, minimum width=3.1cm},
   ar/.style={-{Stealth[length=2mm]}, draw=black!75},
-  lb/.style={font=\scriptsize, align=center, fill=white, inner sep=1pt}]
+  lb/.style={font=\scriptsize, align=center, inner sep=1pt}]
 % people
-\node[pp] (org) at (-3.6,6.9) {Organizer};
-\node[pp] (mem) at (0.3,6.9) {Members};
-\node[pp] (adm) at (4.2,6.9) {Admin (pause only)};
+\node[pp] (org) at (-3.4,6.9) {Organizer};
+\node[pp] (mem) at (0.8,6.9) {Members};
+\node[pp] (adm) at (5.0,6.9) {Admin (pause only)};
 % browser
-\node[box, fill=white, minimum width=13.6cm, minimum height=1.1cm] (ui) at (0.3,5.3) {\textbf{Browser app} (React, Vite, ethers v6): wallet, role based views, transaction tray, error decoder,\\terms re hash check, chain fallback when the indexer is down};
+\node[box, fill=white, minimum width=14.9cm, minimum height=1.1cm] (ui) at (0.75,5.3) {\textbf{Browser app} (React, Vite, ethers v6): wallet, role based views, transaction tray, error decoder,\\terms re hash check, chain fallback when the indexer is down};
 % off chain
 \node[of] (ipfs) at (-4.3,2.9) {IPFS terms store\\(CIDv1, sha256)};
 \node[of] (idx) at (-4.3,1.5) {Indexer + HTTP API\\(SQLite, rebuildable)};
 \node[of] (noti) at (-4.3,0.1) {Notifier\\(in app reminders)};
 \node[of] (keep) at (-4.3,-1.3) {Keeper\\(settle, finalize, cancel)};
 % on chain
-\node[oc, minimum width=3.1cm, font=\small] (fac) at (2.6,2.9) {\code{CircleFactory}};
-\node[oc, minimum width=2.4cm] (tok) at (6.4,2.9) {\code{MockStablecoin}};
-\node[oc, minimum width=2.8cm, font=\small] (circ) at (2.6,1.5) {\code{Circle} clones\\(one per committee)};
-\node[oc, minimum width=2.4cm] (impl) at (6.4,1.5) {\code{Circle}\\implementation};
-\node[oc] (vault) at (0.6,-0.4) {\code{Collateral}\\\code{Vault}};
-\node[oc] (order) at (3.1,-0.4) {\code{PayoutOrder}};
-\node[oc] (rep) at (5.6,-0.4) {\code{Reputation}\\\code{Registry}};
+\node[oc, minimum width=3.1cm, font=\small] (fac) at (2.9,2.9) {\code{CircleFactory}};
+\node[oc, minimum width=2.4cm] (tok) at (6.9,2.9) {\code{MockStablecoin}};
+\node[oc, minimum width=2.8cm, minimum height=1.0cm, font=\small] (circ) at (2.9,1.5) {\code{Circle} clones\\(one per committee)};
+\node[oc, minimum width=2.4cm] (impl) at (6.9,1.5) {\code{Circle}\\implementation};
+\node[oc] (vault) at (0.9,-0.4) {\code{Collateral}\\\code{Vault}};
+\node[oc] (order) at (3.4,-0.4) {\code{PayoutOrder}};
+\node[oc] (rep) at (5.9,-0.4) {\code{Reputation}\\\code{Registry}};
 \begin{scope}[on background layer]
   \node[draw=boxline, rounded corners=5pt, fill=offchain!45, inner sep=8pt, fit=(ipfs)(keep), label={[font=\small\bfseries]below:Off chain (Node.js)}] (offz) {};
-  \node[draw=boxline, rounded corners=5pt, fill=onchain!55, inner sep=8pt, fit=(fac)(tok)(vault)(rep), label={[font=\small\bfseries]below:On chain (Ethereum, Hardhat local)}] (onz) {};
+  \node[draw=boxline, rounded corners=5pt, fill=onchain!55, inner sep=8pt, fit=(fac)(tok)(impl)(vault)(rep), label={[font=\small\bfseries]below:On chain (Ethereum, Hardhat local)}] (onz) {};
 \end{scope}
-\draw[dashed, very thick, black!55] (-1.65,4.1) -- (-1.65,-2.2) node[below, font=\scriptsize]{trust boundary};
-% arrows
+% trust boundary: in the gap between the two zones, below every label
+\draw[dashed, very thick, black!40] (-1.75,3.55) -- (-1.75,-1.95);
+\node[font=\scriptsize, text=black!70, rotate=90] at (-1.47,-0.25) {trust boundary};
+% people to app
 \foreach \p in {org,mem,adm} \draw[ar] (\p) -- (\p |- ui.north);
-\draw[ar] (1.9,0 |- ui.south) -- node[lb]{signed transactions, view calls} (1.9,0 |- fac.north);
-\draw[ar] (-3.3,0 |- ui.south) -- node[lb]{upload, download, re hash terms} (-3.3,0 |- ipfs.north);
-\draw[ar] (-6.35,0 |- ui.south) |- node[lb, pos=0.3, rotate=90, yshift=5pt]{HTTP API} (idx.west);
-\draw[ar, dashed] (circ.west) -- node[lb]{events (read only)} (idx.east);
+% app to services and contracts (labels beside the arrows, never on them)
+\draw[ar] (-4.3,0 |- ui.south) -- node[lb, right, xshift=1pt]{upload, download,\\re hash terms} (-4.3,0 |- ipfs.north);
+\draw[ar] (2.0,0 |- ui.south) -- node[lb, right, xshift=1pt]{signed transactions,\\view calls} (2.0,0 |- fac.north);
+\draw[ar] (-6.6,0 |- ui.south) |- node[lb, pos=0.3, left, rotate=90, anchor=south]{HTTP API} (idx.west);
+% chain to indexer (read only) and keeper to circles (public calls), through the gap
+\draw[ar, dashed] (circ.west |- 0,1.75) -- node[lb, above, pos=0.25]{events\\(read only)} (idx.east |- 0,1.75);
+\draw[ar] (keep.east) -- (-1.1,-1.3) -- (-1.1,1.25) -- (circ.west |- 0,1.25);
+\node[lb, anchor=north] at (0.45,1.18) {public calls};
 \draw[ar] (noti) -- (idx);
-\draw[ar] (keep.east) -- node[lb, pos=0.45]{public calls} (-0.95,-1.3) -- (-0.95,1.2) -- (circ.west |- 0,1.2);
+% inside the chain
 \draw[ar] (fac) -- node[lb, right]{clone} (circ);
-\draw[ar, dashed] (circ) -- node[lb, below=1pt]{delegates} (impl);
-\draw[ar] (circ.north east) -- node[lb, below right, inner sep=0pt]{} (tok.south west);
-\draw[ar] (circ.south) ++(-0.7,0) -- (vault.north);
-\draw[ar] (circ.south) ++(0.3,0) -- (order.north);
+\draw[ar, dashed] (circ) -- node[lb, above]{delegates} (impl);
+\draw[ar] (circ.north east) -- (tok.south west);
+\draw[ar] (circ.south) ++(-0.8,0) -- (vault.north);
+\draw[ar] (circ.south) ++(0.4,0) -- (order.north);
 \draw[ar] (circ.south) ++(1.2,0) -- (rep.north);
 \end{tikzpicture}
-\caption{Architecture: seven contracts, four off chain services, one browser app (blue: on chain, amber: off chain)}
+\caption{Architecture: seven contracts, four off chain services, one browser app (blue: on chain, amber: off chain). Only the dashed events arrow and the keeper's public calls cross the trust boundary.}
 \label{fig:architecture}
 \end{figure}
 
@@ -181,13 +188,13 @@ holding \code{CIRCLE\_ROLE} (Figure~\ref{fig:contracts}).
 \foreach \x in {ini,ac,pa,rg} \draw[inh] (\x.south) -- (\x.south |- base.north);
 \draw[inh] (circle.north) -- (circle.north |- base.south);
 \draw[use] (fac) -- node[lb, above, yshift=2pt]{clones} (circle);
-\draw[use] (circle.south) ++(-1.8,0) -- node[lb, pos=0.5]{CIRCLE\_ROLE} (vault.north);
+\draw[use] (circle.south) ++(-1.8,0) -- (vault.north);
 \draw[use] (circle.south) ++(-0.8,0) -- (order.north);
 \draw[use] (circle.south) ++(0.9,0) -- (rep.north);
-\draw[use] (circle.south) ++(1.9,0) -- node[lb, pos=0.5]{transfers} (tok.north);
+\draw[use] (circle.south) ++(1.9,0) -- (tok.north);
 \draw[use, dashed] (fac.south) -- node[lb, left]{registers} (vault.north west);
 \end{tikzpicture}
-\caption{Inheritance (open triangles) and calls between contracts (arrows)}
+\caption{Inheritance (open triangles), calls (arrows) and registration (dashed). Circle calls the three modules as a holder of \code{CIRCLE\_ROLE} and moves tokens through \code{MockStablecoin}.}
 \label{fig:contracts}
 \end{figure}
 
